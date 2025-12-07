@@ -96,6 +96,9 @@ let gridStyle = $derived(`grid-template-columns: repeat(${gridColumns}, 1fr);`);
 </script>
 
 <div class="container">
+	<div class="project-grid-header">
+		<h2>Projects</h2>
+	</div>
 	<div class="project-grid" style={gridStyle}>
 		{#each visibleProjects as project (project.id)}
 			<ProjectCard
