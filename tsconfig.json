@@ -1,32 +1,27 @@
 {
-  "compilerOptions": {
-    "baseUrl": ".",
-    // "inlineSourceMap": true,
-    // "inlineSources": true,
-    "module": "ESNext",
-    "target": "ES6",
-    "allowJs": true,
-    "sourceMap": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "importHelpers": true,
-    "isolatedModules": true,
-    "strictNullChecks": true,
-    "lib": [
-      "DOM",
-      "ES5",
-      "ES6",
-      "ES7"
-    ],
-    "plugins": [
-      {
-        "name": "@tsconfig/svelte"
-      }
-    ],
-    "types": ["svelte"]
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.svelte"
-  ]
+	"compilerOptions": {
+		"baseUrl": ".",
+		"module": "ESNext",
+		"target": "ES6",
+		"allowJs": true,
+		"sourceMap": true,
+		// "inlineSourceMap": true,
+		"noImplicitAny": true,
+		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"importHelpers": true,
+		"isolatedModules": true,
+		"strictNullChecks": true,
+		"skipLibCheck": true,
+		"lib": ["DOM", "ES5", "ES6", "ES7"],
+		"plugins": [
+			{
+				"name": "@tsconfig/svelte"
+			}
+		],
+		"types": ["svelte", "vite/client"]
+	},
+	"include": ["**/*.ts", "**/*.svelte"]
 }

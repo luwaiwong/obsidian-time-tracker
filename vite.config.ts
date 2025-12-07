@@ -1,14 +1,15 @@
 import { pathToFileURL } from "url";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import * as builtins from "builtin-modules";
+import builtins from "builtin-modules";
 import { PluginOption, defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
-const DEV_DIRECTORY = "../../.md/";
+const DEV_DIRECTORY = "../../.md";
 
 const setOutDir = (mode: string) => {
 	switch (mode) {
 		case "development":
-			return `${DEV_DIRECTORY}.obsidian/plugins/obsidian-time-tracker`;
+			return `${DEV_DIRECTORY}/.obsidian/plugins/obsidian-time-tracker`;
 		case "production":
 			return "build";
 	}
@@ -18,6 +19,7 @@ export default defineConfig(({ mode }) => {
 	return {
 		plugins: [
 			svelte({ preprocess: vitePreprocess() }) as PluginOption,
+			tailwindcss(),
 		],
 		build: {
 			lib: {
@@ -28,10 +30,10 @@ export default defineConfig(({ mode }) => {
 				output: {
 					entryFileNames: "main.js",
 					assetFileNames: "styles.css",
-					sourcemapBaseUrl: pathToFileURL(
-						`${__dirname}`,
-					).toString(),
 				},
+				sourcemapBaseUrl: pathToFileURL(
+					"~/.md/.obsidian/plugins/obsidian-time-tracker",
+				).toString(),
 				external: [
 					"obsidian",
 					"electron",
@@ -51,8 +53,7 @@ export default defineConfig(({ mode }) => {
 			},
 			outDir: setOutDir(mode),
 			emptyOutDir: false,
-			sourcemap: true,
-			// sourcemap: "inline",
+			sourcemap: mode === "development" ? true : false,
 		},
 	};
 });
