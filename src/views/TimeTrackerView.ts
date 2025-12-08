@@ -1,7 +1,6 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import ProjectGrid from "../components/ProjectGrid.svelte";
-import TimeTrackerSummary from "../components/TimeTrackerSummary.svelte";
 import TimeHeader from "../components/TimeHeader.svelte";
 import { ProjectModal } from "../modals/ProjectModal";
 import { mount, unmount } from "svelte";

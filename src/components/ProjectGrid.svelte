@@ -1,104 +1,106 @@
 <script lang="ts">
-import ProjectCard from "./ProjectCard.svelte";
-import type { Project, RunningTimer } from "../types";
-import type TimeTrackerPlugin from "../../main";
+	import ProjectCard from "./ProjectCard.svelte";
+	import type { Project, RunningTimer } from "../types";
+	import type TimeTrackerPlugin from "../../main";
 
-interface Props {
-	plugin: TimeTrackerPlugin;
-	projects: Project[];
-	runningTimers: RunningTimer[];
-	gridColumns?: number;
-}
+	interface Props {
+		plugin: TimeTrackerPlugin;
+		projects: Project[];
+		runningTimers: RunningTimer[];
+		gridColumns?: number;
+	}
 
-let { plugin, projects, runningTimers, gridColumns = 5 }: Props = $props();
+	let { plugin, projects, runningTimers, gridColumns = 5 }: Props = $props();
 
-let currentTime = $state(Date.now());
-let interval: number | undefined;
+	let currentTime = $state(Date.now());
+	let interval: number | undefined;
 
-$effect(() => {
-	if (interval) clearInterval(interval);
-	interval = window.setInterval(() => {
-		currentTime = Date.now();
-	}, 1000);
-
-	return () => {
+	$effect(() => {
 		if (interval) clearInterval(interval);
-	};
-});
+		interval = window.setInterval(() => {
+			currentTime = Date.now();
+		}, 1000);
 
-function handleProjectClick(project: Project) {
-	const isRunning = isProjectRunning(project.id);
+		return () => {
+			if (interval) clearInterval(interval);
+		};
+	});
 
-	if (isRunning && !plugin.settings.multitaskingEnabled) {
-		plugin.stopTimer(project.id);
-	} else if (isRunning && plugin.settings.multitaskingEnabled) {
-		plugin.stopTimer(project.id);
-	} else {
-		plugin.startTimer(project.id, plugin.settings.retroactiveTrackingEnabled);
-	}
-}
+	function handleProjectClick(project: Project) {
+		const isRunning = isProjectRunning(project.id);
 
-function isProjectRunning(projectId: number): boolean {
-	return runningTimers.some((t) => t.projectId === projectId);
-}
-
-function getRunningDuration(projectId: number): number {
-	const timer = runningTimers.find((t) => t.projectId === projectId);
-	if (!timer) return 0;
-	return currentTime - timer.startTime;
-}
-
-function sortProjects(projectList: Project[]): Project[] {
-	const sorted = [...projectList];
-
-	switch (plugin.settings.sortMode) {
-		case "name":
-			return sorted.sort((a, b) => a.name.localeCompare(b.name));
-
-		case "category":
-			return sorted.sort((a, b) => {
-				if (a.categoryId === b.categoryId) {
-					return a.order - b.order;
-				}
-				return a.categoryId - b.categoryId;
-			});
-
-		case "recent": {
-			const lastUsed = new Map<number, number>();
-			for (const record of plugin.timesheetData.records) {
-				const current = lastUsed.get(record.projectId) || 0;
-				if (record.endTime > current) {
-					lastUsed.set(record.projectId, record.endTime);
-				}
-			}
-			return sorted.sort((a, b) => {
-				const aTime = lastUsed.get(a.id) || 0;
-				const bTime = lastUsed.get(b.id) || 0;
-				return bTime - aTime;
-			});
+		if (isRunning && !plugin.settings.multitaskingEnabled) {
+			plugin.stopTimer(project.id);
+		} else if (isRunning && plugin.settings.multitaskingEnabled) {
+			plugin.stopTimer(project.id);
+		} else {
+			plugin.startTimer(
+				project.id,
+				plugin.settings.retroactiveTrackingEnabled,
+			);
 		}
-
-		case "manual":
-		default:
-			return sorted.sort((a, b) => a.order - b.order);
 	}
-}
 
-function getVisibleProjects(): Project[] {
-	const filtered = projects.filter(
-		(p) => plugin.settings.showArchivedProjects || !p.archived,
+	function isProjectRunning(projectId: number): boolean {
+		return runningTimers.some((t) => t.projectId === projectId);
+	}
+
+	function getRunningDuration(projectId: number): number {
+		const timer = runningTimers.find((t) => t.projectId === projectId);
+		if (!timer) return 0;
+		return currentTime - timer.startTime;
+	}
+
+	function sortProjects(projectList: Project[]): Project[] {
+		const sorted = [...projectList];
+
+		switch (plugin.settings.sortMode) {
+			case "name":
+				return sorted.sort((a, b) => a.name.localeCompare(b.name));
+
+			case "category":
+				return sorted.sort((a, b) => {
+					if (a.categoryId === b.categoryId) {
+						return a.order - b.order;
+					}
+					return a.categoryId - b.categoryId;
+				});
+
+			case "recent": {
+				const lastUsed = new Map<number, number>();
+				for (const record of plugin.timesheetData.records) {
+					const current = lastUsed.get(record.projectId) || 0;
+					if (record.endTime > current) {
+						lastUsed.set(record.projectId, record.endTime);
+					}
+				}
+				return sorted.sort((a, b) => {
+					const aTime = lastUsed.get(a.id) || 0;
+					const bTime = lastUsed.get(b.id) || 0;
+					return bTime - aTime;
+				});
+			}
+
+			case "manual":
+			default:
+				return sorted.sort((a, b) => a.order - b.order);
+		}
+	}
+
+	function getVisibleProjects(): Project[] {
+		const filtered = projects.filter(
+			(p) => plugin.settings.showArchivedProjects || !p.archived,
+		);
+		return sortProjects(filtered);
+	}
+
+	let visibleProjects = $derived(getVisibleProjects());
+	let gridStyle = $derived(
+		`grid-template-columns: repeat(${gridColumns}, 1fr);`,
 	);
-	return sortProjects(filtered);
-}
-
-let visibleProjects = $derived(getVisibleProjects());
-let gridStyle = $derived(`grid-template-columns: repeat(${gridColumns}, 1fr);`);
 </script>
 
 <div class="container">
-	<div class="project-grid-header">
-		<h2>Projects</h2>
-	</div>
 	<div class="project-grid" style={gridStyle}>
 		{#each visibleProjects as project (project.id)}
 			<ProjectCard

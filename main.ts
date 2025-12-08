@@ -5,6 +5,7 @@ import {
   VIEW_TYPE_TIME_TRACKER,
 } from "./src/views/TimeTrackerView";
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
+import { ScheduleView, VIEW_TYPE_SCHEDULE } from "./src/views/ScheduleView";
 import { CSVHandler } from "./src/csvHandler";
 import type { PluginSettings, TimesheetData, RunningTimer } from "./src/types";
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
@@ -50,6 +51,10 @@ export default class TimeTrackerPlugin extends Plugin {
       VIEW_TYPE_ANALYTICS,
       (leaf) => new AnalyticsView(leaf, this),
     );
+    this.registerView(
+      VIEW_TYPE_SCHEDULE,
+      (leaf) => new ScheduleView(leaf, this),
+    );
 
     // ribbon Icon
     this.addRibbonIcon("clock", "Time Tracker", () => {
@@ -69,6 +74,13 @@ export default class TimeTrackerPlugin extends Plugin {
       name: "Open Analytics",
       callback: () => {
         this.activateAnalyticsView();
+      },
+    });
+    this.addCommand({
+      id: "open-schedule",
+      name: "Open Schedule",
+      callback: () => {
+        this.activateScheduleView();
       },
     });
     this.addCommand({
@@ -195,6 +207,26 @@ export default class TimeTrackerPlugin extends Plugin {
       leaf = workspace.getLeaf(true);
       if (leaf) {
         await leaf.setViewState({ type: VIEW_TYPE_ANALYTICS, active: true });
+      }
+    }
+
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async activateScheduleView() {
+    const { workspace } = this.app;
+
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_SCHEDULE);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      leaf = workspace.getLeaf(true);
+      if (leaf) {
+        await leaf.setViewState({ type: VIEW_TYPE_SCHEDULE, active: true });
       }
     }
 
@@ -356,6 +388,12 @@ export default class TimeTrackerPlugin extends Plugin {
     // trigger a refresh for all analytics views
     this.app.workspace.getLeavesOfType(VIEW_TYPE_ANALYTICS).forEach((leaf) => {
       if (leaf.view instanceof AnalyticsView) {
+        leaf.view.refresh();
+      }
+    });
+    // trigger a refresh for all schedule views
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_SCHEDULE).forEach((leaf) => {
+      if (leaf.view instanceof ScheduleView) {
         leaf.view.refresh();
       }
     });
