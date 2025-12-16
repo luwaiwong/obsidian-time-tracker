@@ -9,9 +9,8 @@ export const VIEW_TYPE_TIME_TRACKER = "time-tracker-view";
 
 export class TimeTrackerView extends ItemView {
 	plugin: TimeTrackerPlugin;
-	private gridComponent: Record<string, any> | null = null;
-	private summaryComponent: Record<string, any> | null = null;
-	private headerComponent: Record<string, any> | null = null;
+	private gridComponent: Record<string, unknown> | null = null;
+	private headerComponent: Record<string, unknown> | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: TimeTrackerPlugin) {
 		super(leaf);
@@ -35,7 +34,6 @@ export class TimeTrackerView extends ItemView {
 		container.empty();
 		container.addClass("time-tracker-view");
 
-		// Header with buttons and timer
 		const header = container.createDiv("time-tracker-header");
 
 		this.headerComponent = mount(TimeHeader, {
@@ -52,7 +50,7 @@ export class TimeTrackerView extends ItemView {
 					this.plugin.activateAnalyticsView();
 				},
 				onOpenSettings: () => {
-					// @ts-ignore
+					// @ts-ignore - accessing internal Obsidian API
 					this.plugin.app.setting.open();
 					// @ts-ignore
 					this.plugin.app.setting.openTabById("time-tracker");
@@ -66,10 +64,8 @@ export class TimeTrackerView extends ItemView {
 			},
 		});
 
-		// Content area
 		const content = container.createDiv("time-tracker-content");
 
-		// show project grid
 		this.gridComponent = mount(ProjectGrid, {
 			target: content,
 			props: {
@@ -89,10 +85,6 @@ export class TimeTrackerView extends ItemView {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 			this.gridComponent = null;
-		}
-		if (this.summaryComponent) {
-			unmount(this.summaryComponent);
-			this.summaryComponent = null;
 		}
 	}
 

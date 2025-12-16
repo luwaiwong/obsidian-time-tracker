@@ -2,6 +2,8 @@
  * Utility functions for the time tracker plugin
  */
 
+import type { TimeLog } from "./types";
+
 /**
  * Format duration in milliseconds to human-readable string
  */
@@ -17,53 +19,60 @@ export function formatDuration(
 	if (showSeconds) {
 		if (hours > 0) {
 			return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-		} else {
-			return `${minutes}:${String(seconds).padStart(2, "0")}`;
 		}
-	} else {
-		// Without seconds, show in verbose format
-		if (hours > 0) {
-			return `${hours}h ${minutes}m ${seconds}s`;
-		} else if (minutes > 0) {
-			return `${minutes}m ${seconds}s`;
-		} else {
-			return `${seconds}s`;
-		}
+		return `${minutes}:${String(seconds).padStart(2, "0")}`;
 	}
-}
 
-/**
- * Convert Android color format to hex (for backwards compatibility when reading old data)
- */
-export function androidColorToHex(color: number): string {
-	const unsigned = color >>> 0;
-	const hex = unsigned.toString(16).padStart(8, "0");
-	return `#${hex.substring(2)}`;
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m`;
+	}
+	return `${seconds}s`;
 }
 
 /**
  * Get total duration for a project within a time range
+ * Works with the new TimeLog structure (uses projectName and Date objects)
  */
 export function getProjectDuration(
-	projectId: number,
-	records: any[],
+	projectName: string,
+	logs: TimeLog[],
 	startTime?: number,
 	endTime?: number,
 ): number {
-	return records
-		.filter((r) => r.projectId === projectId)
-		.filter((r) => {
-			if (startTime && r.endTime < startTime) return false;
-			if (endTime && r.startTime > endTime) return false;
+	return logs
+		.filter((l) => l.projectName === projectName && l.endTime !== null)
+		.filter((l) => {
+			const logEnd = l.endTime!.getTime();
+			const logStart = l.startTime.getTime();
+			if (startTime && logEnd < startTime) return false;
+			if (endTime && logStart > endTime) return false;
 			return true;
 		})
-		.reduce((total, record) => {
-			const start = startTime
-				? Math.max(record.startTime, startTime)
-				: record.startTime;
-			const end = endTime ? Math.min(record.endTime, endTime) : record.endTime;
+		.reduce((total, log) => {
+			const logStart = log.startTime.getTime();
+			const logEnd = log.endTime!.getTime();
+			const start = startTime ? Math.max(logStart, startTime) : logStart;
+			const end = endTime ? Math.min(logEnd, endTime) : logEnd;
 			return total + (end - start);
 		}, 0);
+}
+
+/**
+ * Get total duration for a project by ID within a time range
+ */
+export function getProjectDurationById(
+	projectId: number,
+	logs: TimeLog[],
+	projectsMap: Map<number, string>,
+	startTime?: number,
+	endTime?: number,
+): number {
+	const projectName = projectsMap.get(projectId);
+	if (!projectName) return 0;
+	return getProjectDuration(projectName, logs, startTime, endTime);
 }
 
 /**
@@ -81,7 +90,7 @@ export function getTimeRange(
 			start.setHours(0, 0, 0, 0);
 			end.setHours(23, 59, 59, 999);
 			break;
-		case "week":
+		case "week": {
 			const dayOfWeek = start.getDay();
 			const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
 			start.setDate(start.getDate() + diffToMonday);
@@ -89,6 +98,7 @@ export function getTimeRange(
 			end.setDate(start.getDate() + 6);
 			end.setHours(23, 59, 59, 999);
 			break;
+		}
 		case "month":
 			start.setDate(1);
 			start.setHours(0, 0, 0, 0);
@@ -118,7 +128,18 @@ export function formatDate(timestamp: number): string {
 /**
  * Format datetime to readable string
  */
-export function formatDateTime(timestamp: number): string {
-	const date = new Date(timestamp);
+export function formatDateTime(timestamp: number | Date): string {
+	const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
 	return date.toLocaleString();
+}
+
+/**
+ * Format time of day (HH:MM)
+ */
+export function formatTimeOfDay(timestamp: number | Date): string {
+	const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+	return date.toLocaleTimeString([], {
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 }

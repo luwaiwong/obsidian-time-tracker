@@ -7,7 +7,7 @@ export const VIEW_TYPE_SCHEDULE = "time-tracker-schedule";
 
 export class ScheduleView extends ItemView {
 	plugin: TimeTrackerPlugin;
-	private component: Record<string, any> | null = null;
+	private component: Record<string, unknown> | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: TimeTrackerPlugin) {
 		super(leaf);
@@ -49,4 +49,3 @@ export class ScheduleView extends ItemView {
 		this.onOpen();
 	}
 }
-

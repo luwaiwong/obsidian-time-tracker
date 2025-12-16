@@ -51,6 +51,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						await this.refreshAndSavePlugin();
 					}),
 			);
+
 		new Setting(containerEl)
 			.setName("Enable retroactive tracking")
 			.setDesc(
@@ -79,6 +80,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						await this.refreshAndSavePlugin();
 					}),
 			);
+
 		new Setting(containerEl)
 			.setName("Show archived projects")
 			.setDesc("Display archived projects in the grid view")
@@ -90,6 +92,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						await this.refreshAndSavePlugin();
 					}),
 			);
+
 		new Setting(containerEl)
 			.setName("Grid columns")
 			.setDesc("Number of columns in the project grid (1-6)")
@@ -103,6 +106,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						await this.refreshAndSavePlugin();
 					}),
 			);
+
 		new Setting(containerEl)
 			.setName("Sort mode")
 			.setDesc("How to sort projects in the grid")
@@ -113,10 +117,14 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					.addOption("name", "By Name")
 					.addOption("recent", "Recently Used")
 					.setValue(this.plugin.settings.sortMode)
-					.onChange(async (value: any) => {
-						this.plugin.settings.sortMode = value;
-						await this.refreshAndSavePlugin();
-					}),
+					.onChange(
+						async (
+							value: "manual" | "category" | "name" | "recent",
+						) => {
+							this.plugin.settings.sortMode = value;
+							await this.refreshAndSavePlugin();
+						},
+					),
 			);
 
 		// analytics section
@@ -133,10 +141,14 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					.addOption("year", "Year")
 					.addOption("custom", "Custom")
 					.setValue(this.plugin.settings.defaultTimeRange)
-					.onChange(async (value: any) => {
-						this.plugin.settings.defaultTimeRange = value;
-						await this.refreshAndSavePlugin();
-					}),
+					.onChange(
+						async (
+							value: "day" | "week" | "month" | "year" | "custom",
+						) => {
+							this.plugin.settings.defaultTimeRange = value;
+							await this.refreshAndSavePlugin();
+						},
+					),
 			);
 
 		// notifications section
@@ -153,17 +165,23 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						await this.refreshAndSavePlugin();
 					}),
 			);
+
 		new Setting(containerEl)
 			.setName("Inactivity reminder")
-			.setDesc("Remind after this many seconds of inactivity (0 to disable)")
+			.setDesc(
+				"Remind after this many seconds of inactivity (0 to disable)",
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("3600")
-					.setValue(String(this.plugin.settings.inactivityReminderDuration))
+					.setValue(
+						String(this.plugin.settings.inactivityReminderDuration),
+					)
 					.onChange(async (value) => {
 						const num = parseInt(value);
 						if (!isNaN(num) && num >= 0) {
-							this.plugin.settings.inactivityReminderDuration = num;
+							this.plugin.settings.inactivityReminderDuration =
+								num;
 							await this.refreshAndSavePlugin();
 						}
 					}),
@@ -176,7 +194,9 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.addText((text) =>
 				text
 					.setPlaceholder("1800")
-					.setValue(String(this.plugin.settings.activityReminderDuration))
+					.setValue(
+						String(this.plugin.settings.activityReminderDuration),
+					)
 					.onChange(async (value) => {
 						const num = parseInt(value);
 						if (!isNaN(num) && num >= 0) {
@@ -191,7 +211,9 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Recent logs count")
-			.setDesc("Number of recent time records to show in embedded trackers")
+			.setDesc(
+				"Number of recent time records to show in embedded trackers",
+			)
 			.addSlider((slider) =>
 				slider
 					.setLimits(1, 20, 1)
@@ -209,16 +231,18 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		const projectsDiv = containerEl.createDiv("time-tracker-projects");
 		this.displayProjects(projectsDiv);
 
-		new Setting(containerEl).setName("Add new project").addButton((button) =>
-			button
-				.setButtonText("Add Project")
-				.setCta()
-				.onClick(() => {
-					new ProjectModal(this.app, this.plugin, null, () => {
-						this.display(); // Refresh the settings page
-					}).open();
-				}),
-		);
+		new Setting(containerEl)
+			.setName("Add new project")
+			.addButton((button) =>
+				button
+					.setButtonText("Add Project")
+					.setCta()
+					.onClick(() => {
+						new ProjectModal(this.app, this.plugin, null, () => {
+							this.display();
+						}).open();
+					}),
+			);
 
 		// category management section
 		containerEl.createEl("h3", { text: "Category Management" });
@@ -226,15 +250,17 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		const categoriesDiv = containerEl.createDiv("time-tracker-categories");
 		this.displayCategories(categoriesDiv);
 
-		new Setting(containerEl).setName("Add new category").addButton((button) =>
-			button
-				.setButtonText("Add Category")
-				.setCta()
-				.onClick(async () => {
-					await this.addNewCategory();
-					this.display(); // Refresh the settings page
-				}),
-		);
+		new Setting(containerEl)
+			.setName("Add new category")
+			.addButton((button) =>
+				button
+					.setButtonText("Add Category")
+					.setCta()
+					.onClick(async () => {
+						await this.addNewCategory();
+						this.display();
+					}),
+			);
 	}
 
 	private displayProjects(containerEl: HTMLElement) {
@@ -248,7 +274,9 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		}
 
 		for (const project of projects) {
-			const projectDiv = containerEl.createDiv("time-tracker-project-item");
+			const projectDiv = containerEl.createDiv(
+				"time-tracker-project-item",
+			);
 
 			const categoryName = this.getCategoryName(project.categoryId);
 
@@ -262,9 +290,14 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						.setIcon("pencil")
 						.setTooltip("Edit project")
 						.onClick(() => {
-							new ProjectModal(this.app, this.plugin, project, () => {
-								this.display();
-							}).open();
+							new ProjectModal(
+								this.app,
+								this.plugin,
+								project,
+								() => {
+									this.display();
+								},
+							).open();
 						}),
 				)
 				.addExtraButton((button) =>
@@ -285,14 +318,13 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						.onClick(async () => {
 							if (
 								confirm(
-									`Delete project "${project.name}"? All time records will be kept.`,
+									`Delete project "${project.name}"? All time logs will be kept.`,
 								)
 							) {
 								this.plugin.timesheetData.projects =
 									this.plugin.timesheetData.projects.filter(
 										(p) => p.id !== project.id,
 									);
-								this.plugin.timesheetData.projectCategories.delete(project.id);
 								await this.plugin.saveTimesheet();
 								this.plugin.refreshViews();
 								this.display();
@@ -311,8 +343,8 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 
 	private displayCategories(containerEl: HTMLElement) {
 		const categories = this.plugin.timesheetData.categories.filter(
-			(c) => c.id !== -1,
-		); // Exclude "Uncategorized"
+			(c) => c.id !== 1,
+		);
 
 		if (categories.length === 0) {
 			containerEl.createEl("p", {
@@ -322,22 +354,29 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		}
 
 		for (const category of categories) {
-			const categoryDiv = containerEl.createDiv("time-tracker-category-item");
+			const categoryDiv = containerEl.createDiv(
+				"time-tracker-category-item",
+			);
 
 			new Setting(categoryDiv)
 				.setName(category.name)
 				.addColorPicker((colorPicker) =>
-					colorPicker.setValue(category.color).onChange(async (value) => {
-						category.color = value;
-						await this.plugin.saveTimesheet();
-					}),
+					colorPicker
+						.setValue(category.color)
+						.onChange(async (value) => {
+							category.color = value;
+							await this.plugin.saveTimesheet();
+						}),
 				)
 				.addExtraButton((button) =>
 					button
 						.setIcon("pencil")
 						.setTooltip("Rename category")
 						.onClick(async () => {
-							const newName = prompt("Enter new category name:", category.name);
+							const newName = prompt(
+								"Enter new category name:",
+								category.name,
+							);
 							if (newName && newName.trim()) {
 								category.name = newName.trim();
 								await this.plugin.saveTimesheet();
@@ -368,11 +407,15 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		if (!name || !name.trim()) return;
 
 		const newId =
-			Math.max(...this.plugin.timesheetData.categories.map((c) => c.id), 0) + 1;
+			Math.max(
+				...this.plugin.timesheetData.categories.map((c) => c.id),
+				0,
+			) + 1;
 		const newCategory = {
 			id: newId,
 			name: name.trim(),
 			color: this.getRandomColor(),
+			archived: false,
 			order: this.plugin.timesheetData.categories.length,
 		};
 
@@ -381,19 +424,16 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 	}
 
 	private async deleteCategory(categoryId: number) {
-		// Remove category
 		this.plugin.timesheetData.categories =
-			this.plugin.timesheetData.categories.filter((c) => c.id !== categoryId);
+			this.plugin.timesheetData.categories.filter(
+				(c) => c.id !== categoryId,
+			);
 
-		// Move projects to Uncategorized
 		for (const project of this.plugin.timesheetData.projects) {
 			if (project.categoryId === categoryId) {
 				project.categoryId = -1;
 			}
 		}
-
-		// Update projectCategories map
-		this.plugin.timesheetData.projectCategories.delete(categoryId);
 
 		await this.plugin.saveTimesheet();
 	}

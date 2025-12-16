@@ -41,7 +41,6 @@ export class ProjectModal extends Modal {
 			text: this.project ? "Edit Project" : "New Project",
 		});
 
-		// Project Name
 		new Setting(contentEl)
 			.setName("Project Name")
 			.setDesc("The name of your project")
@@ -54,7 +53,6 @@ export class ProjectModal extends Modal {
 					}),
 			);
 
-		// Icon Type
 		new Setting(contentEl)
 			.setName("Icon Type")
 			.setDesc("Choose between emoji or text icon")
@@ -70,7 +68,6 @@ export class ProjectModal extends Modal {
 					}),
 			);
 
-		// Icon
 		new Setting(contentEl)
 			.setName("Icon")
 			.setDesc(
@@ -87,7 +84,6 @@ export class ProjectModal extends Modal {
 					}),
 			);
 
-		// Color
 		new Setting(contentEl)
 			.setName("Color")
 			.setDesc("Pick a color for this project")
@@ -97,14 +93,13 @@ export class ProjectModal extends Modal {
 				}),
 			);
 
-		// Category
 		new Setting(contentEl)
 			.setName("Category")
 			.setDesc("Assign to a category (optional)")
 			.addDropdown((dropdown) => {
 				dropdown.addOption("-1", "Uncategorized");
 				for (const category of this.plugin.timesheetData.categories) {
-					if (category.id !== -1) {
+					if (category.id !== 1) {
 						dropdown.addOption(String(category.id), category.name);
 					}
 				}
@@ -114,7 +109,6 @@ export class ProjectModal extends Modal {
 				});
 			});
 
-		// Buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
 		buttonContainer.style.display = "flex";
 		buttonContainer.style.justifyContent = "flex-end";
@@ -150,31 +144,32 @@ export class ProjectModal extends Modal {
 
 	async save() {
 		if (!this.nameInput.trim() || !this.iconInput.trim()) {
-			// Show error notification
 			new Notice("Please enter both project name and icon");
 			return;
 		}
 
 		if (this.project) {
-			// Update existing project
-			this.project.name = this.nameInput.trim();
+			const oldName = this.project.name;
+			const newName = this.nameInput.trim();
+
+			this.project.name = newName;
 			this.project.icon = this.iconInput.trim();
 			this.project.iconType = this.iconType;
 			this.project.color = this.colorInput;
 			this.project.categoryId = this.categoryId;
 
-			// Update category mapping
-			if (this.categoryId !== -1) {
-				this.plugin.timesheetData.projectCategories.set(
-					this.project.id,
-					this.categoryId,
-				);
-			} else {
-				this.plugin.timesheetData.projectCategories.delete(this.project.id);
+			// Update all logs that reference the old project name
+			if (oldName !== newName) {
+				for (const log of this.plugin.timesheetData.logs) {
+					if (log.projectName === oldName) {
+						log.projectName = newName;
+					}
+				}
 			}
 		} else {
-			// Create new project
-			const newId = CSVHandler.getNextId(this.plugin.timesheetData.projects);
+			const newId = CSVHandler.getNextId(
+				this.plugin.timesheetData.projects,
+			);
 			const newProject: Project = {
 				id: newId,
 				name: this.nameInput.trim(),
@@ -187,10 +182,6 @@ export class ProjectModal extends Modal {
 			};
 
 			this.plugin.timesheetData.projects.push(newProject);
-
-			if (this.categoryId !== -1) {
-				this.plugin.timesheetData.projectCategories.set(newId, this.categoryId);
-			}
 		}
 
 		await this.plugin.saveTimesheet();

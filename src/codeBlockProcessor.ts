@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext } from "obsidian";
+import type { MarkdownPostProcessorContext } from "obsidian";
 import type TimeTrackerPlugin from "../main";
 import EmbeddedTracker from "./components/EmbeddedTracker.svelte";
 import { mount } from "svelte";
@@ -6,11 +6,13 @@ import { mount } from "svelte";
 export class TimeTrackerCodeBlockProcessor {
 	constructor(private plugin: TimeTrackerPlugin) {}
 
-	process(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		// Parse the code block configuration
+	process(
+		source: string,
+		el: HTMLElement,
+		_ctx: MarkdownPostProcessorContext,
+	) {
 		const config = this.parseConfig(source);
 
-		// Create the embedded tracker component
 		mount(EmbeddedTracker, {
 			target: el,
 			props: {
@@ -22,15 +24,17 @@ export class TimeTrackerCodeBlockProcessor {
 
 	private parseConfig(source: string): EmbeddedTrackerConfig {
 		const config: EmbeddedTrackerConfig = {
-			type: "all", // 'all', 'project', 'category'
+			type: "all",
 			projectId: null,
 			categoryId: null,
 			recentLogs: 5,
 			showRunningTimer: true,
-			size: "normal", // 'small', 'normal', 'large'
+			size: "normal",
 		};
 
-		const lines = source.split("\n").filter((line) => line.trim().length > 0);
+		const lines = source
+			.split("\n")
+			.filter((line) => line.trim().length > 0);
 
 		for (const line of lines) {
 			const [key, value] = line.split(":").map((s) => s.trim());
@@ -43,8 +47,7 @@ export class TimeTrackerCodeBlockProcessor {
 					config.projectId = parseInt(value);
 					config.type = "project";
 					break;
-				case "projectname":
-					// Find project by name
+				case "projectname": {
 					const project = this.plugin.timesheetData.projects.find(
 						(p) => p.name.toLowerCase() === value.toLowerCase(),
 					);
@@ -53,12 +56,12 @@ export class TimeTrackerCodeBlockProcessor {
 						config.type = "project";
 					}
 					break;
+				}
 				case "category":
 					config.categoryId = parseInt(value);
 					config.type = "category";
 					break;
-				case "categoryname":
-					// Find category by name
+				case "categoryname": {
 					const category = this.plugin.timesheetData.categories.find(
 						(c) => c.name.toLowerCase() === value.toLowerCase(),
 					);
@@ -67,6 +70,7 @@ export class TimeTrackerCodeBlockProcessor {
 						config.type = "category";
 					}
 					break;
+				}
 				case "recentlogs":
 					config.recentLogs = parseInt(value);
 					break;

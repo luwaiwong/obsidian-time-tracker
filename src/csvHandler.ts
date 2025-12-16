@@ -1,37 +1,36 @@
 import { TFile, Vault } from "obsidian";
 import type {
 	Project,
-	TimeRecord,
+	TimeLog,
 	Category,
-	RecordTag,
-	ProjectGoal,
 	TimesheetData,
 	CSVLineType,
 } from "./types";
 
 /**
- * Handles reading and writing the timesheet.csv file
- * Format is inspired by Simple Time Tracker app
+ * Handles reading and writing the timesheet.csv file.
+ *
+ * CSV Format (human-readable):
+ *   log,<id>,<projectName>,<startTime>,<endTime>,<title>
+ *   project,<id>,<name>,<icon>,<color>,<archived>
+ *   category,<id>,<name>,<color>,<archived>
+ *
+ * Times use ISO 8601 format (YYYY-MM-DDTHH:MM:SS).
+ * Running timers have empty endTime field.
  */
 export class CSVHandler {
 	constructor(private vault: Vault) {}
 
-	/**
-	 * Parse the timesheet.csv file into structured data
-	 */
 	async parseTimesheet(file: TFile): Promise<TimesheetData> {
 		const content = await this.vault.read(file);
-		const lines = content.split("\n").filter((line) => line.trim().length > 0);
+		const lines = content
+			.split("\n")
+			.filter((line) => line.trim().length > 0);
 
 		const data: TimesheetData = {
+			logs: [],
 			projects: [],
-			records: [],
 			categories: [],
-			projectCategories: new Map(),
-			tags: [],
-			recordTags: new Map(),
-			goals: [],
-			preferences: new Map(),
 		};
 
 		for (const line of lines) {
@@ -41,29 +40,14 @@ export class CSVHandler {
 			const type = parts[0] as CSVLineType;
 
 			switch (type) {
-				case "recordType":
-					this.parseProject(parts, data);
+				case "log":
+					this.parseLog(parts, data);
 					break;
-				case "record":
-					this.parseRecord(parts, data);
+				case "project":
+					this.parseProject(parts, data);
 					break;
 				case "category":
 					this.parseCategory(parts, data);
-					break;
-				case "typeCategory":
-					this.parseProjectCategory(parts, data);
-					break;
-				case "recordTag":
-					this.parseTag(parts, data);
-					break;
-				case "recordToRecordTag":
-					this.parseRecordTag(parts, data);
-					break;
-				case "recordTypeGoal":
-					this.parseGoal(parts, data);
-					break;
-				case "prefs":
-					this.parsePreference(parts, data);
 					break;
 			}
 		}
@@ -71,28 +55,45 @@ export class CSVHandler {
 		return data;
 	}
 
+	private parseLog(parts: string[], data: TimesheetData): void {
+		// Format: log,id,projectName,startTime,endTime,title
+		if (parts.length < 5) return;
+
+		const id = parseInt(parts[1]);
+		const projectName = parts[2];
+		const startTimeStr = parts[3];
+		const endTimeStr = parts[4];
+		const title = parts.length > 5 ? parts[5] : "";
+
+		const startTime = this.parseDateTime(startTimeStr);
+		if (!startTime) return;
+
+		// endTime can be empty for running timers
+		const endTime = endTimeStr ? this.parseDateTime(endTimeStr) : null;
+
+		data.logs.push({
+			id,
+			projectName,
+			startTime,
+			endTime,
+			title,
+		});
+	}
+
 	private parseProject(parts: string[], data: TimesheetData): void {
-		// Format: recordType,id,name,icon,color,archived,order
-		if (parts.length < 7) return;
+		// Format: project,id,name,icon,color,archived
+		if (parts.length < 6) return;
 
 		const id = parseInt(parts[1]);
 		const name = parts[2];
 		const icon = parts[3];
-		const colorValue = parts[4];
-		const archived = parts[5] === "1";
-		const order = parts.length > 6 ? parseInt(parts[6]) : 0;
+		const color = this.normalizeColor(parts[4]);
+		const archived = parts[5] === "1" || parts[5].toLowerCase() === "true";
 
-		// Determine if icon is emoji or text
 		const iconType = this.isEmoji(icon) ? "emoji" : "text";
 
-		// Convert color: if it's a number (old format), convert to hex; otherwise use as-is
-		let color: string;
-		if (colorValue.startsWith("#")) {
-			color = colorValue;
-		} else {
-			const androidColor = parseInt(colorValue);
-			color = CSVHandler.androidColorToHex(androidColor);
-		}
+		// Determine order and categoryId from existing projects
+		const order = data.projects.length;
 
 		data.projects.push({
 			id,
@@ -100,148 +101,74 @@ export class CSVHandler {
 			icon,
 			iconType,
 			color,
-			categoryId: -1, // will be set by typeCategory
+			categoryId: -1,
 			archived,
 			order,
 		});
 	}
 
-	private parseRecord(parts: string[], data: TimesheetData): void {
-		// Format: record,id,projectId,startTime,endTime
-		if (parts.length < 5) return;
-
-		const id = parseInt(parts[1]);
-		const projectId = parseInt(parts[2]);
-		const startTime = parseInt(parts[3]);
-		const endTime = parseInt(parts[4]);
-
-		data.records.push({
-			id,
-			projectId,
-			startTime,
-			endTime,
-			tags: [], // will be populated by recordToRecordTag
-		});
-	}
-
 	private parseCategory(parts: string[], data: TimesheetData): void {
-		// Format: category,id,name,color,order
+		// Format: category,id,name,color,archived
 		if (parts.length < 5) return;
 
 		const id = parseInt(parts[1]);
 		const name = parts[2];
-		const colorValue = parts[3];
-		const order = parts.length > 4 ? parseInt(parts[4]) : 0;
+		const color = this.normalizeColor(parts[3]);
+		const archived = parts[4] === "1" || parts[4].toLowerCase() === "true";
 
-		// Convert color: if it's a number (old format), convert to hex; otherwise use as-is
-		let color: string;
-		if (colorValue.startsWith("#")) {
-			color = colorValue;
-		} else {
-			const androidColor = parseInt(colorValue);
-			color = CSVHandler.androidColorToHex(androidColor);
-		}
+		const order = data.categories.length;
 
 		data.categories.push({
 			id,
 			name,
 			color,
+			archived,
 			order,
 		});
 	}
 
-	private parseProjectCategory(parts: string[], data: TimesheetData): void {
-		// Format: typeCategory,projectId,categoryId
-		if (parts.length < 3) return;
+	private parseDateTime(str: string): Date | null {
+		if (!str || str.trim() === "") return null;
 
-		const projectId = parseInt(parts[1]);
-		const categoryId = parseInt(parts[2]);
-
-		data.projectCategories.set(projectId, categoryId);
-
-		// Update the project's categoryId
-		const project = data.projects.find((p) => p.id === projectId);
-		if (project) {
-			project.categoryId = categoryId;
+		// Try ISO format first
+		const date = new Date(str);
+		if (!isNaN(date.getTime())) {
+			return date;
 		}
+
+		// Try milliseconds timestamp (backwards compatibility)
+		const ms = parseInt(str);
+		if (!isNaN(ms)) {
+			return new Date(ms);
+		}
+
+		return null;
 	}
 
-	private parseTag(parts: string[], data: TimesheetData): void {
-		// Format: recordTag,id,name,icon,color,archived
-		if (parts.length < 6) return;
+	private formatDateTime(date: Date): string {
+		// Format: YYYY-MM-DD HH:MM:SS (human readable)
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, "0");
+		const day = String(date.getDate()).padStart(2, "0");
+		const hours = String(date.getHours()).padStart(2, "0");
+		const minutes = String(date.getMinutes()).padStart(2, "0");
+		const seconds = String(date.getSeconds()).padStart(2, "0");
 
-		const id = parseInt(parts[1]);
-		const name = parts[2];
-		const icon = parts[3];
-		const colorValue = parts[4];
-		const archived = parts[5] === "1";
+		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+	}
 
-		// Convert color: if it's a number (old format), convert to hex; otherwise use as-is
-		let color: string;
+	private normalizeColor(colorValue: string): string {
 		if (colorValue.startsWith("#")) {
-			color = colorValue;
-		} else {
-			const androidColor = parseInt(colorValue);
-			color = CSVHandler.androidColorToHex(androidColor);
+			return colorValue;
 		}
-
-		data.tags.push({
-			id,
-			name,
-			icon,
-			color,
-			archived,
-		});
-	}
-
-	private parseRecordTag(parts: string[], data: TimesheetData): void {
-		// Format: recordToRecordTag,recordId,tagId
-		if (parts.length < 3) return;
-
-		const recordId = parseInt(parts[1]);
-		const tagId = parseInt(parts[2]);
-
-		const tags = data.recordTags.get(recordId) || [];
-		tags.push(tagId);
-		data.recordTags.set(recordId, tags);
-
-		// Update the record's tags array
-		const record = data.records.find((r) => r.id === recordId);
-		if (record) {
-			record.tags = tags;
+		// Handle Android color format (backwards compatibility)
+		const androidColor = parseInt(colorValue);
+		if (!isNaN(androidColor)) {
+			return CSVHandler.androidColorToHex(androidColor);
 		}
+		return colorValue;
 	}
 
-	private parseGoal(parts: string[], data: TimesheetData): void {
-		// Format: recordTypeGoal,projectId,unused,type,targetSeconds,enabled,days,extra
-		if (parts.length < 7) return;
-
-		const projectId = parseInt(parts[1]);
-		const type = parseInt(parts[3]); // Using index 3 for type
-		const targetSeconds = parseInt(parts[4]);
-		const enabled = parts[5] === "1";
-
-		data.goals.push({
-			projectId,
-			type,
-			targetSeconds,
-			enabled,
-		});
-	}
-
-	private parsePreference(parts: string[], data: TimesheetData): void {
-		// Format: prefs,key,value
-		if (parts.length < 3) return;
-
-		const key = parts[1];
-		const value = parts.slice(2).join(",");
-
-		data.preferences.set(key, value);
-	}
-
-	/**
-	 * Parse a CSV line, handling quoted fields
-	 */
 	private parseCSVLine(line: string): string[] {
 		const result: string[] = [];
 		let current = "";
@@ -251,7 +178,12 @@ export class CSVHandler {
 			const char = line[i];
 
 			if (char === '"') {
-				inQuotes = !inQuotes;
+				if (inQuotes && line[i + 1] === '"') {
+					current += '"';
+					i++;
+				} else {
+					inQuotes = !inQuotes;
+				}
 			} else if (char === "," && !inQuotes) {
 				result.push(current);
 				current = "";
@@ -264,98 +196,83 @@ export class CSVHandler {
 		return result;
 	}
 
-	/**
-	 * Escape a field for CSV format
-	 */
 	private escapeCSVField(field: string): string {
-		if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+		if (
+			field.includes(",") ||
+			field.includes('"') ||
+			field.includes("\n")
+		) {
 			return `"${field.replace(/"/g, '""')}"`;
 		}
 		return field;
 	}
 
-	/**
-	 * Serialize timesheet data back to CSV format
-	 */
 	async writeTimesheet(file: TFile, data: TimesheetData): Promise<void> {
 		const lines: string[] = [];
 
-		// Write projects (recordType)
-		for (const project of data.projects) {
-			lines.push(
-				`recordType,${project.id},${this.escapeCSVField(project.name)},${this.escapeCSVField(project.icon)},${project.color},${project.archived ? 1 : 0},${project.order}`,
-			);
-		}
-
-		// Write records
-		for (const record of data.records) {
-			lines.push(
-				`record,${record.id},${record.projectId},${record.startTime},${record.endTime}`,
-			);
-		}
-
-		// Write categories
+		// Write categories first
 		for (const category of data.categories) {
 			lines.push(
-				`category,${category.id},${this.escapeCSVField(category.name)},${category.color},${category.order}`,
+				[
+					"category",
+					category.id,
+					this.escapeCSVField(category.name),
+					category.color,
+					category.archived ? "1" : "0",
+				].join(","),
 			);
 		}
 
-		// Write project-category mappings
-		for (const [projectId, categoryId] of data.projectCategories.entries()) {
-			lines.push(`typeCategory,${projectId},${categoryId}`);
-		}
-
-		// Write tags
-		for (const tag of data.tags) {
+		// Write projects
+		for (const project of data.projects) {
 			lines.push(
-				`recordTag,${tag.id},${this.escapeCSVField(tag.name)},${this.escapeCSVField(tag.icon)},${tag.color},${tag.archived ? 1 : 0}`,
+				[
+					"project",
+					project.id,
+					this.escapeCSVField(project.name),
+					this.escapeCSVField(project.icon),
+					project.color,
+					project.archived ? "1" : "0",
+				].join(","),
 			);
 		}
 
-		// Write record-tag mappings
-		for (const [recordId, tagIds] of data.recordTags.entries()) {
-			for (const tagId of tagIds) {
-				lines.push(`recordToRecordTag,${recordId},${tagId}`);
-			}
-		}
+		// Write logs
+		for (const log of data.logs) {
+			const startTimeStr = this.formatDateTime(log.startTime);
+			const endTimeStr = log.endTime
+				? this.formatDateTime(log.endTime)
+				: "";
 
-		// Write goals
-		for (const goal of data.goals) {
 			lines.push(
-				`recordTypeGoal,${goal.projectId},0,${goal.type},${goal.targetSeconds},${goal.enabled ? 1 : 0},0000000,0`,
+				[
+					"log",
+					log.id,
+					this.escapeCSVField(log.projectName),
+					startTimeStr,
+					endTimeStr,
+					this.escapeCSVField(log.title),
+				].join(","),
 			);
-		}
-
-		// Write preferences
-		for (const [key, value] of data.preferences.entries()) {
-			lines.push(`prefs,${key},${this.escapeCSVField(value)}`);
 		}
 
 		const content = lines.join("\n");
 		await this.vault.modify(file, content);
 	}
 
-	/**
-	 * Create a new empty timesheet file
-	 */
 	async createTimesheet(path: string): Promise<TFile> {
 		const initialData: TimesheetData = {
+			logs: [],
 			projects: [],
-			records: [],
 			categories: [
-				{ id: -1, name: "Uncategorized", color: "#88C0D0", order: 0 },
+				{
+					id: 1,
+					name: "Uncategorized",
+					color: "#88C0D0",
+					archived: false,
+					order: 0,
+				},
 			],
-			projectCategories: new Map(),
-			tags: [],
-			recordTags: new Map(),
-			goals: [],
-			preferences: new Map([
-				["multitaskingEnabled", "0"],
-				["retroactiveTrackingEnabled", "0"],
-				["showSeconds", "1"],
-				["gridColumns", "3"],
-			]),
 		};
 
 		const file = await this.vault.create(path, "");
@@ -363,28 +280,18 @@ export class CSVHandler {
 		return file;
 	}
 
-	/**
-	 * Check if a string is an emoji
-	 */
 	private isEmoji(str: string): boolean {
 		const emojiRegex =
 			/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
 		return emojiRegex.test(str);
 	}
 
-	/**
-	 * Convert Android color format to hex (for backwards compatibility when reading old data)
-	 */
 	static androidColorToHex(color: number): string {
-		// Android color is in ARGB format as a signed integer
-		const unsigned = color >>> 0; // Convert to unsigned
+		const unsigned = color >>> 0;
 		const hex = unsigned.toString(16).padStart(8, "0");
-		return `#${hex.substring(2)}`; // Remove alpha channel
+		return `#${hex.substring(2)}`;
 	}
 
-	/**
-	 * Get next available ID for a given array
-	 */
 	static getNextId(items: { id: number }[]): number {
 		if (items.length === 0) return 1;
 		return Math.max(...items.map((i) => i.id)) + 1;

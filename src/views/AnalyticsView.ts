@@ -7,7 +7,7 @@ export const VIEW_TYPE_ANALYTICS = "time-tracker-analytics";
 
 export class AnalyticsView extends ItemView {
 	plugin: TimeTrackerPlugin;
-	private component: Record<string, any> | null = null;
+	private component: Record<string, unknown> | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: TimeTrackerPlugin) {
 		super(leaf);

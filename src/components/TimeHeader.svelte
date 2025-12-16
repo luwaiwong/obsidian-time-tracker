@@ -63,22 +63,30 @@
 
 	function getTimerDisplay(): string {
 		if (runningTimers.length > 0) {
-			// Get the earliest running timer
 			const earliestTimer = runningTimers.reduce((earliest, timer) =>
-				timer.startTime < earliest.startTime ? timer : earliest,
+				timer.startTime.getTime() < earliest.startTime.getTime()
+					? timer
+					: earliest,
 			);
-			const elapsed = currentTime - earliestTimer.startTime;
+			const elapsed = currentTime - earliestTimer.startTime.getTime();
 			return formatDuration(elapsed);
 		}
 
-		// Show time since last track
-		const sortedRecords = [...plugin.timesheetData.records].sort(
-			(a, b) => b.endTime - a.endTime,
+		const completedLogs = plugin.timesheetData.logs.filter(
+			(l) => l.endTime !== null,
 		);
-		if (sortedRecords.length > 0) {
-			const lastEndTime = sortedRecords[0].endTime;
-			const elapsed = currentTime - lastEndTime;
-			return formatDuration(elapsed);
+		if (completedLogs.length > 0) {
+			const lastLog = completedLogs.reduce((latest, log) => {
+				if (!latest.endTime) return log;
+				if (!log.endTime) return latest;
+				return log.endTime.getTime() > latest.endTime.getTime()
+					? log
+					: latest;
+			});
+			if (lastLog.endTime) {
+				const elapsed = currentTime - lastLog.endTime.getTime();
+				return formatDuration(elapsed);
+			}
 		}
 
 		return "0:00";
@@ -94,7 +102,6 @@
 <div
 	class="flex items-center justify-between px-4 py-3 border-b border-[var(--background-modifier-border)]"
 >
-	<!-- Left side: Timer display -->
 	<div class="flex flex-col items-start">
 		<div class="text-xs text-[--text-muted] tracking-wide">
 			{timerLabel}
@@ -103,7 +110,6 @@
 			{timerDisplay}
 		</div>
 	</div>
-	<!-- Right side: Action buttons -->
 	<div class="flex items-center gap-2">
 		<button
 			bind:this={addBtnRef}

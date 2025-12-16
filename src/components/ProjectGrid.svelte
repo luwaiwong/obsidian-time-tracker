@@ -29,9 +29,7 @@
 	function handleProjectClick(project: Project) {
 		const isRunning = isProjectRunning(project.id);
 
-		if (isRunning && !plugin.settings.multitaskingEnabled) {
-			plugin.stopTimer(project.id);
-		} else if (isRunning && plugin.settings.multitaskingEnabled) {
+		if (isRunning) {
 			plugin.stopTimer(project.id);
 		} else {
 			plugin.startTimer(
@@ -48,7 +46,7 @@
 	function getRunningDuration(projectId: number): number {
 		const timer = runningTimers.find((t) => t.projectId === projectId);
 		if (!timer) return 0;
-		return currentTime - timer.startTime;
+		return currentTime - timer.startTime.getTime();
 	}
 
 	function sortProjects(projectList: Project[]): Project[] {
@@ -68,10 +66,13 @@
 
 			case "recent": {
 				const lastUsed = new Map<number, number>();
-				for (const record of plugin.timesheetData.records) {
-					const current = lastUsed.get(record.projectId) || 0;
-					if (record.endTime > current) {
-						lastUsed.set(record.projectId, record.endTime);
+				for (const log of plugin.timesheetData.logs) {
+					if (log.endTime === null) continue;
+					const project = plugin.getProjectByName(log.projectName);
+					if (!project) continue;
+					const current = lastUsed.get(project.id) || 0;
+					if (log.endTime.getTime() > current) {
+						lastUsed.set(project.id, log.endTime.getTime());
 					}
 				}
 				return sorted.sort((a, b) => {
