@@ -268,10 +268,10 @@
 </script>
 
 <div
-	class="overview-container border-b border-[var(--background-modifier-border)]"
+	class="overview-container border-b border-(--background-modifier-border) px-2 pt-2"
 >
 	<!-- Top row: Project selector + Analytics/Settings -->
-	<div class="flex items-center justify-between px-4 pt-3 pb-1">
+	<div class="flex items-center justify-between">
 		<!-- Left: Project Badge or Select Project button -->
 		{#if isTracking && currentProject}
 			<button
@@ -313,11 +313,11 @@
 	</div>
 
 	<!-- Main row: Play/Stop | Title | Timer -->
-	<div class="flex items-center gap-3 px-4 pb-3">
+	<div class="flex items-center gap-3 pb-2">
 		<!-- Play/Stop Button -->
 		{#if isTracking}
 			<button
-				class="w-14 h-14 rounded-full flex items-center justify-center transition-all shrink-0 bg-[var(--background-modifier-hover)] hover:bg-[var(--text-error)]"
+				class="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 bg-[var(--background-modifier-hover)] hover:bg-[var(--text-error)]"
 				onclick={handleStop}
 				onmouseenter={() => (isPlayButtonHovering = true)}
 				onmouseleave={() => (isPlayButtonHovering = false)}
@@ -329,7 +329,7 @@
 		{:else}
 			<button
 				bind:this={playBtnRef}
-				class="w-14 h-14 rounded-full flex items-center justify-center bg-[var(--interactive-accent)] hover:bg-[var(--interactive-accent-hover)] transition-colors shrink-0"
+				class="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--interactive-accent)] hover:bg-[var(--interactive-accent-hover)] transition-colors shrink-0"
 				onclick={handlePlay}
 				aria-label="Start tracking"
 			></button>
@@ -359,7 +359,7 @@
 		</div>
 
 		<!-- Right: Timer Display -->
-		<div class="shrink-0 text-right min-w-[4rem]">
+		<div class="shrink-0 text-right min-w-16">
 			{#if !isTracking}
 				<div class="text-[9px] text-[var(--text-faint)]">
 					elapsed time
@@ -377,9 +377,9 @@
 
 	<!-- Last Records Section -->
 	{#if recentLogs.length > 0}
-		<div class="px-4 pb-3">
+		<div class="pb-3">
 			<div
-				class="text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1.5"
+				class="text-[10px] text-(--text-faint) uppercase tracking-wider mb-1.5"
 			>
 				Last Records
 			</div>
@@ -387,7 +387,7 @@
 				{#each recentLogs as log (log.id)}
 					{@const project = plugin.getProjectByName(log.projectName)}
 					<div
-						class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[var(--background-modifier-hover)]"
+						class="flex items-center gap-2 py-1.5rounded hover:bg-[var(--background-modifier-hover)]"
 					>
 						<!-- Project indicator -->
 						{#if project}
