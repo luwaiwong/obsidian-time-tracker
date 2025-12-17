@@ -15,6 +15,7 @@ import type {
 	Project,
 } from "./src/types";
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
+import { ImportModal } from "./src/modals/ImportModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -83,6 +84,11 @@ export default class TimeTrackerPlugin extends Plugin {
 			id: "toggle-last-timer",
 			name: "Toggle Last Used Timer",
 			callback: () => this.toggleLastTimer(),
+		});
+		this.addCommand({
+			id: "import-data",
+			name: "Import Data from Simple Time Tracker",
+			callback: () => new ImportModal(this.app, this).open(),
 		});
 
 		this.registerMarkdownCodeBlockProcessor(
