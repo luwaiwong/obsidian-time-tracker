@@ -15,7 +15,6 @@ export interface Project {
 	id: number;
 	name: string;
 	icon: string;
-	iconType: "emoji" | "text";
 	color: string;
 	categoryId: number;
 	archived: boolean;

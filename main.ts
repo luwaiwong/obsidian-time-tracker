@@ -37,15 +37,15 @@ const DEFAULT_SETTINGS: PluginSettings = {
 
 export default class TimeTrackerPlugin extends Plugin {
 	settings: PluginSettings;
-	timesheetData: TimesheetData;
+	timesheetData: TimesheetData = { logs: [], projects: [], categories: [] };
 	csvHandler: CSVHandler;
 	private timesheetFile: TFile | null = null;
 	error: string | null = null;
+	isLoading: boolean = true;
 
 	async onload() {
 		await this.loadSettings();
 		this.csvHandler = new CSVHandler(this.app.vault);
-		await this.loadTimesheet();
 
 		this.registerView(
 			VIEW_TYPE_TIME_TRACKER,
@@ -95,7 +95,8 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
 
-		this.app.workspace.onLayoutReady(() => {
+		this.app.workspace.onLayoutReady(async () => {
+			await this.loadTimesheet();
 			this.activateView();
 		});
 
@@ -121,10 +122,13 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	async loadTimesheet() {
+		this.isLoading = true;
+		console.log("Loading timesheet...");
 		try {
-			const file = this.app.vault.getAbstractFileByPath(
+			const file = await this.app.vault.getAbstractFileByPath(
 				this.settings.timesheetPath,
 			);
+			console.log("File found:", file);
 
 			if (file instanceof TFile) {
 				this.timesheetFile = file;
@@ -140,6 +144,9 @@ export default class TimeTrackerPlugin extends Plugin {
 		} catch (err) {
 			console.error("Error loading timesheet:", err);
 			this.error = "Error loading Timesheet: " + err;
+		} finally {
+			this.isLoading = false;
+			this.refreshViews();
 		}
 	}
 
@@ -159,6 +166,9 @@ export default class TimeTrackerPlugin extends Plugin {
 
 	/** Get running timers derived from logs with null endTime */
 	get runningTimers(): RunningTimer[] {
+		if (!this.timesheetData || !this.timesheetData.logs) {
+			return [];
+		}
 		return this.timesheetData.logs
 			.filter((log) => log.endTime === null)
 			.map((log) => {
@@ -173,10 +183,16 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	getProjectByName(name: string): Project | undefined {
+		if (!this.timesheetData || !this.timesheetData.projects) {
+			return undefined;
+		}
 		return this.timesheetData.projects.find((p) => p.name === name);
 	}
 
 	getProjectById(id: number): Project | undefined {
+		if (!this.timesheetData || !this.timesheetData.projects) {
+			return undefined;
+		}
 		return this.timesheetData.projects.find((p) => p.id === id);
 	}
 

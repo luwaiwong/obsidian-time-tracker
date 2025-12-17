@@ -8,3 +8,19 @@ If your plugin does not need CSS, delete this file.
 */
 
 @import "tailwindcss";
+
+/* Loading and error states */
+.time-tracker-loading,
+.time-tracker-error {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+	text-align: center;
+	min-height: 200px;
+	font-size: var(--font-ui-medium);
+}
+
+.time-tracker-error {
+	color: var(--text-error);
+}

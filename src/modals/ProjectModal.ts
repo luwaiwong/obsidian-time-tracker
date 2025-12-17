@@ -9,8 +9,7 @@ export class ProjectModal extends Modal {
 	onSave: () => void;
 
 	private nameInput: string = "";
-	private iconInput: string = "";
-	private iconType: "emoji" | "text" = "emoji";
+	private iconInput: string = "🕐";
 	private colorInput: string = "#4ECDC4";
 	private categoryId: number = -1;
 
@@ -28,7 +27,6 @@ export class ProjectModal extends Modal {
 		if (project) {
 			this.nameInput = project.name;
 			this.iconInput = project.icon;
-			this.iconType = project.iconType;
 			this.colorInput = project.color;
 			this.categoryId = project.categoryId;
 		}
@@ -54,30 +52,11 @@ export class ProjectModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName("Icon Type")
-			.setDesc("Choose between emoji or text icon")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("emoji", "Emoji")
-					.addOption("text", "Text")
-					.setValue(this.iconType)
-					.onChange((value: "emoji" | "text") => {
-						this.iconType = value;
-						this.contentEl.empty();
-						this.onOpen();
-					}),
-			);
-
-		new Setting(contentEl)
 			.setName("Icon")
-			.setDesc(
-				this.iconType === "emoji"
-					? "Enter an emoji (e.g., 📚)"
-					: "Enter text (e.g., MAT, 301)",
-			)
+			.setDesc("Enter an emoji or text (e.g., 📚, MAT, 301)")
 			.addText((text) =>
 				text
-					.setPlaceholder(this.iconType === "emoji" ? "📚" : "MAT")
+					.setPlaceholder("📚")
 					.setValue(this.iconInput)
 					.onChange((value) => {
 						this.iconInput = value;
@@ -154,7 +133,6 @@ export class ProjectModal extends Modal {
 
 			this.project.name = newName;
 			this.project.icon = this.iconInput.trim();
-			this.project.iconType = this.iconType;
 			this.project.color = this.colorInput;
 			this.project.categoryId = this.categoryId;
 
@@ -174,7 +152,6 @@ export class ProjectModal extends Modal {
 				id: newId,
 				name: this.nameInput.trim(),
 				icon: this.iconInput.trim(),
-				iconType: this.iconType,
 				color: this.colorInput,
 				categoryId: this.categoryId,
 				archived: false,

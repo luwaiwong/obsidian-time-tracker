@@ -90,8 +90,6 @@ export class CSVHandler {
 		const color = this.normalizeColor(parts[4]);
 		const archived = parts[5] === "1" || parts[5].toLowerCase() === "true";
 
-		const iconType = this.isEmoji(icon) ? "emoji" : "text";
-
 		// Determine order and categoryId from existing projects
 		const order = data.projects.length;
 
@@ -99,7 +97,6 @@ export class CSVHandler {
 			id,
 			name,
 			icon,
-			iconType,
 			color,
 			categoryId: -1,
 			archived,
@@ -278,12 +275,6 @@ export class CSVHandler {
 		const file = await this.vault.create(path, "");
 		await this.writeTimesheet(file, initialData);
 		return file;
-	}
-
-	private isEmoji(str: string): boolean {
-		const emojiRegex =
-			/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
-		return emojiRegex.test(str);
 	}
 
 	static androidColorToHex(color: number): string {
