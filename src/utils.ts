@@ -2,7 +2,9 @@
  * Utility functions for the time tracker plugin
  */
 
+import { Attachment } from "svelte/attachments";
 import type { TimeLog } from "./types";
+import { setIcon } from "obsidian";
 
 /**
  * Format duration in milliseconds to human-readable string
@@ -142,4 +144,10 @@ export function formatTimeOfDay(timestamp: number | Date): string {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
+}
+
+export function icon(iconName: string): Attachment<HTMLElement> {
+	return (node: HTMLElement) => {
+		setIcon(node, iconName);
+	};
 }

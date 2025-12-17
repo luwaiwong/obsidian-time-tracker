@@ -24,3 +24,137 @@ If your plugin does not need CSS, delete this file.
 .time-tracker-error {
 	color: var(--text-error);
 }
+
+/* Overview Component */
+.overview-container {
+	/* No background color */
+}
+
+/* Last Records Section */
+.last-record-repeat-btn,
+.last-record-edit-btn {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Project Selector Modal */
+.project-selector-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	margin-top: 16px;
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.project-selector-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 12px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	transition:
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
+	color: white;
+}
+
+.project-selector-btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.project-selector-create {
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
+	border: 1px dashed var(--background-modifier-border);
+}
+
+.project-selector-icon {
+	font-size: 1.25rem;
+}
+
+.project-selector-name {
+	font-size: 0.75rem;
+	text-align: center;
+	word-break: break-word;
+}
+
+/* Retroactive Modal */
+.retroactive-time-info {
+	margin-bottom: 12px;
+	padding: 8px;
+	background-color: var(--background-secondary);
+	border-radius: 4px;
+}
+
+.retroactive-project-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	margin: 16px 0;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.retroactive-project-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 10px;
+	border-radius: 6px;
+	border: 2px solid transparent;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	color: white;
+}
+
+.retroactive-project-btn:hover {
+	transform: translateY(-1px);
+}
+
+.retroactive-project-btn.selected {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.retroactive-project-icon {
+	font-size: 1.25rem;
+}
+
+.retroactive-project-name {
+	font-size: 0.75rem;
+	text-align: center;
+	word-break: break-word;
+}
+
+/* Project Selector Modal (merged) */
+.project-selector-modal {
+	max-width: 500px;
+}
+
+.project-selector-modal .retroactive-info {
+	margin-bottom: 12px;
+	padding: 8px 12px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+}
+
+.project-selector-modal .project-grid-label {
+	margin-top: 16px;
+	margin-bottom: 8px;
+	font-weight: 500;
+}
+
+.project-selector-modal .project-grid-container {
+	margin-bottom: 8px;
+}

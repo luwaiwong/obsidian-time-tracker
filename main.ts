@@ -19,7 +19,7 @@ import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
 	settingsPath: "time-tracker-settings.json",
-	multitaskingEnabled: false,
+
 	retroactiveTrackingEnabled: false,
 	showSeconds: true,
 	showArchivedProjects: false,
@@ -266,6 +266,26 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
+	/** Start tracking time without a project */
+	startTimerWithoutProject(title: string = "") {
+		const now = new Date();
+
+		this.stopAllTimers();
+
+		// Create a new log with null endTime (running timer) and empty projectName
+		const newLog: TimeLog = {
+			id: CSVHandler.getNextId(this.timesheetData.logs),
+			projectName: "",
+			startTime: now,
+			endTime: null,
+			title: title,
+		};
+		this.timesheetData.logs.push(newLog);
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
 	/** Start tracking time for a project */
 	startTimer(projectId: number, retroactive: boolean = false) {
 		const project = this.getProjectById(projectId);
@@ -300,9 +320,7 @@ export default class TimeTrackerPlugin extends Plugin {
 				}
 			}
 		} else {
-			if (!this.settings.multitaskingEnabled) {
-				this.stopAllTimers();
-			}
+			this.stopAllTimers();
 
 			// Check if this project is already running
 			const existingTimer = this.runningTimers.find(
@@ -329,12 +347,21 @@ export default class TimeTrackerPlugin extends Plugin {
 
 	/** Stop a specific timer */
 	stopTimer(projectId: number) {
-		const project = this.getProjectById(projectId);
-		if (!project) return;
+		let logIndex: number;
 
-		const logIndex = this.timesheetData.logs.findIndex(
-			(l) => l.projectName === project.name && l.endTime === null,
-		);
+		if (projectId === -1) {
+			// Stop timer without project (empty projectName)
+			logIndex = this.timesheetData.logs.findIndex(
+				(l) => l.projectName === "" && l.endTime === null,
+			);
+		} else {
+			const project = this.getProjectById(projectId);
+			if (!project) return;
+
+			logIndex = this.timesheetData.logs.findIndex(
+				(l) => l.projectName === project.name && l.endTime === null,
+			);
+		}
 
 		if (logIndex === -1) return;
 
@@ -399,6 +426,61 @@ export default class TimeTrackerPlugin extends Plugin {
 	/** Get running timer for a project */
 	getRunningTimer(projectId: number): RunningTimer | undefined {
 		return this.runningTimers.find((t) => t.projectId === projectId);
+	}
+
+	/** Update a log's title */
+	updateLogTitle(logId: number, title: string): void {
+		const index = this.timesheetData.logs.findIndex((l) => l.id === logId);
+		if (index !== -1) {
+			this.timesheetData.logs[index].title = title;
+			this.saveTimesheet();
+		}
+	}
+
+	/** Get the current running log (first one if multiple) */
+	getCurrentRunningLog(): TimeLog | null {
+		const timer = this.runningTimers[0];
+		if (!timer) return null;
+		return (
+			this.timesheetData.logs.find((l) => l.id === timer.logId) || null
+		);
+	}
+
+	/** Create a retroactive log entry */
+	createRetroactiveLog(projectId: number, title: string): void {
+		const project = this.getProjectById(projectId);
+		if (!project) return;
+
+		const now = new Date();
+		const lastLog = this.getLastStoppedLog();
+
+		if (lastLog?.endTime) {
+			// Check if should extend
+			if (
+				lastLog.projectName === project.name &&
+				lastLog.title === title
+			) {
+				const index = this.timesheetData.logs.findIndex(
+					(l) => l.id === lastLog.id,
+				);
+				if (index !== -1) {
+					this.timesheetData.logs[index].endTime = now;
+				}
+			} else {
+				// Create new completed log
+				const newLog: TimeLog = {
+					id: CSVHandler.getNextId(this.timesheetData.logs),
+					projectName: project.name,
+					startTime: lastLog.endTime,
+					endTime: now,
+					title: title,
+				};
+				this.timesheetData.logs.push(newLog);
+			}
+		}
+
+		this.saveTimesheet();
+		this.refreshViews();
 	}
 
 	/** Refresh all open views */

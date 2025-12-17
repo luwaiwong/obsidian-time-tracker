@@ -43,7 +43,7 @@ export interface Category {
 export interface PluginSettings {
 	timesheetPath: string;
 	settingsPath: string;
-	multitaskingEnabled: boolean;
+
 	retroactiveTrackingEnabled: boolean;
 	showSeconds: boolean;
 	showArchivedProjects: boolean;

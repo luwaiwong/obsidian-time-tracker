@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import ProjectGrid from "../components/ProjectGrid.svelte";
 import TimeTrackerSummary from "../components/TimeSummary.svelte";
-import TimeHeader from "../components/TimeHeader.svelte";
+import Overview from "../components/Overview.svelte";
 import { ProjectModal } from "../modals/ProjectModal";
 import { mount, unmount } from "svelte";
 
@@ -53,16 +53,11 @@ export class TimeTrackerView extends ItemView {
 		// Header with buttons and timer
 		const header = container.createDiv("time-tracker-header");
 
-		this.headerComponent = mount(TimeHeader, {
+		this.headerComponent = mount(Overview, {
 			target: header,
 			props: {
 				plugin: this.plugin,
 				runningTimers: this.plugin.runningTimers || [],
-				onAddProject: () => {
-					new ProjectModal(this.plugin.app, this.plugin, null, () => {
-						this.refresh();
-					}).open();
-				},
 				onOpenAnalytics: () => {
 					this.plugin.activateAnalyticsView();
 				},
@@ -72,12 +67,9 @@ export class TimeTrackerView extends ItemView {
 					// @ts-ignore
 					this.plugin.app.setting.openTabById("time-tracker");
 				},
-				onStopAll:
-					this.plugin.runningTimers.length > 0
-						? () => {
-								this.plugin.stopAllTimers();
-							}
-						: undefined,
+				onRefresh: () => {
+					this.refresh();
+				},
 			},
 		});
 

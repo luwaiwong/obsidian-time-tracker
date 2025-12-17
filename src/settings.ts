@@ -39,20 +39,6 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		containerEl.createEl("h3", { text: "Tracking Behavior" });
 
 		new Setting(containerEl)
-			.setName("Enable multitasking")
-			.setDesc(
-				"Allow multiple timers to run simultaneously. When disabled, starting a new timer stops the current one.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.multitaskingEnabled)
-					.onChange(async (value) => {
-						this.plugin.settings.multitaskingEnabled = value;
-						await this.refreshAndSavePlugin();
-					}),
-			);
-
-		new Setting(containerEl)
 			.setName("Enable retroactive tracking")
 			.setDesc(
 				"When starting a timer, automatically assign the gap since the last stopped timer to the new project.",
