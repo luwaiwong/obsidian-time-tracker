@@ -1,10 +1,10 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import type { TimeLog } from "../types";
+import type { TimeRecord } from "../types";
 
-export class EditLogModal extends Modal {
+export class EditRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
-	log: TimeLog;
+	record: TimeRecord;
 	onSave: () => void;
 
 	private titleInput: string;
@@ -14,18 +14,18 @@ export class EditLogModal extends Modal {
 	constructor(
 		app: App,
 		plugin: TimeTrackerPlugin,
-		log: TimeLog,
+		record: TimeRecord,
 		onSave: () => void,
 	) {
 		super(app);
 		this.plugin = plugin;
-		this.log = log;
+		this.record = record;
 		this.onSave = onSave;
 
-		this.titleInput = log.title;
-		this.startTimeInput = this.toDateTimeLocal(log.startTime);
-		this.endTimeInput = log.endTime
-			? this.toDateTimeLocal(log.endTime)
+		this.titleInput = record.title;
+		this.startTimeInput = this.toDateTimeLocal(record.startTime);
+		this.endTimeInput = record.endTime
+			? this.toDateTimeLocal(record.endTime)
 			: "";
 	}
 
@@ -37,7 +37,7 @@ export class EditLogModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 
-		contentEl.createEl("h2", { text: "Edit Log Entry" });
+		contentEl.createEl("h2", { text: "Edit Record Entry" });
 
 		new Setting(contentEl)
 			.setName("Title")
@@ -122,11 +122,11 @@ export class EditLogModal extends Modal {
 	}
 
 	async save() {
-		const index = this.plugin.timesheetData.logs.findIndex(
-			(l) => l.id === this.log.id,
+		const index = this.plugin.timesheetData.records.findIndex(
+			(r) => r.id === this.record.id,
 		);
 		if (index === -1) {
-			new Notice("Log entry not found");
+			new Notice("Record entry not found");
 			return;
 		}
 
@@ -148,9 +148,9 @@ export class EditLogModal extends Modal {
 			return;
 		}
 
-		this.plugin.timesheetData.logs[index].title = this.titleInput.trim();
-		this.plugin.timesheetData.logs[index].startTime = newStart;
-		this.plugin.timesheetData.logs[index].endTime = newEnd;
+		this.plugin.timesheetData.records[index].title = this.titleInput.trim();
+		this.plugin.timesheetData.records[index].startTime = newStart;
+		this.plugin.timesheetData.records[index].endTime = newEnd;
 
 		await this.plugin.saveTimesheet();
 		this.plugin.refreshViews();
@@ -159,19 +159,19 @@ export class EditLogModal extends Modal {
 	}
 
 	async delete() {
-		const index = this.plugin.timesheetData.logs.findIndex(
-			(l) => l.id === this.log.id,
+		const index = this.plugin.timesheetData.records.findIndex(
+			(r) => r.id === this.record.id,
 		);
 		if (index === -1) {
-			new Notice("Log entry not found");
+			new Notice("Record entry not found");
 			return;
 		}
 
-		this.plugin.timesheetData.logs.splice(index, 1);
+		this.plugin.timesheetData.records.splice(index, 1);
 		await this.plugin.saveTimesheet();
 		this.plugin.refreshViews();
 		this.onSave();
-		new Notice("Log entry deleted");
+		new Notice("Record entry deleted");
 		this.close();
 	}
 }

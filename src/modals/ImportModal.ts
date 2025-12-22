@@ -1,7 +1,7 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import type { Category, Project, TimeLog } from "../types";
-import { CSVHandler } from "../csvHandler";
+import type { Category, Project, TimeRecord } from "../types";
+import { CSVHandler } from "../utils/csvHandler";
 
 interface STTRecordType {
 	id: number;
@@ -73,9 +73,7 @@ export class ImportModal extends Modal {
 
 		new Setting(contentEl)
 			.addButton((button) =>
-				button
-					.setButtonText("Cancel")
-					.onClick(() => this.close()),
+				button.setButtonText("Cancel").onClick(() => this.close()),
 			)
 			.addButton((button) =>
 				button
@@ -91,7 +89,9 @@ export class ImportModal extends Modal {
 	}
 
 	private parseSTTBackup(content: string): ParsedSTTData {
-		const lines = content.split("\n").filter((line) => line.trim().length > 0);
+		const lines = content
+			.split("\n")
+			.filter((line) => line.trim().length > 0);
 
 		const data: ParsedSTTData = {
 			recordTypes: [],
@@ -235,7 +235,10 @@ export class ImportModal extends Modal {
 		try {
 			const sttData = this.parseSTTBackup(this.fileContent);
 
-			if (sttData.recordTypes.length === 0 && sttData.records.length === 0) {
+			if (
+				sttData.recordTypes.length === 0 &&
+				sttData.records.length === 0
+			) {
 				new Notice("No valid data found in the backup file");
 				return;
 			}
@@ -249,7 +252,7 @@ export class ImportModal extends Modal {
 			for (const sttCat of sttData.categories) {
 				// Check if category already exists by name
 				const existing = existingCategories.find(
-					(c) => c.name.toLowerCase() === sttCat.name.toLowerCase()
+					(c) => c.name.toLowerCase() === sttCat.name.toLowerCase(),
 				);
 
 				if (existing) {
@@ -286,7 +289,7 @@ export class ImportModal extends Modal {
 			for (const rt of sttData.recordTypes) {
 				// Check if project already exists by name
 				const existing = existingProjects.find(
-					(p) => p.name.toLowerCase() === rt.name.toLowerCase()
+					(p) => p.name.toLowerCase() === rt.name.toLowerCase(),
 				);
 
 				if (existing) {
@@ -308,34 +311,34 @@ export class ImportModal extends Modal {
 				}
 			}
 
-			// Import time logs (records)
-			const existingLogs = this.plugin.timesheetData.logs;
-			let nextLogId = CSVHandler.getNextId(existingLogs);
-			let importedLogs = 0;
+			// Import time records
+			const existingRecords = this.plugin.timesheetData.records;
+			let nextRecordId = CSVHandler.getNextId(existingRecords);
+			let importedRecords = 0;
 
 			for (const record of sttData.records) {
 				const projectName = projectNameMap.get(record.typeId);
 				if (!projectName) continue;
 
-				// Check for duplicate logs (same project, same start time)
+				// Check for duplicate records (same project, same start time)
 				const startTime = new Date(record.startTime);
-				const isDuplicate = existingLogs.some(
-					(l) =>
-						l.projectName === projectName &&
-						l.startTime.getTime() === startTime.getTime()
+				const isDuplicate = existingRecords.some(
+					(r) =>
+						r.projectName === projectName &&
+						r.startTime.getTime() === startTime.getTime(),
 				);
 
 				if (!isDuplicate) {
-					const newLog: TimeLog = {
-						id: nextLogId,
+					const newRecord: TimeRecord = {
+						id: nextRecordId,
 						projectName: projectName,
 						startTime: startTime,
 						endTime: new Date(record.endTime),
 						title: record.comment || "",
 					};
-					this.plugin.timesheetData.logs.push(newLog);
-					nextLogId++;
-					importedLogs++;
+					this.plugin.timesheetData.records.push(newRecord);
+					nextRecordId++;
+					importedRecords++;
 				}
 			}
 
@@ -346,7 +349,7 @@ export class ImportModal extends Modal {
 			const projectsImported = sttData.recordTypes.length;
 
 			new Notice(
-				`Imported ${importedLogs} time logs, ${projectsImported} projects, ${categoriesImported} categories`
+				`Imported ${importedRecords} time records, ${projectsImported} projects, ${categoriesImported} categories`,
 			);
 
 			this.close();

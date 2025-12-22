@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { EmbeddedTrackerConfig } from "../codeBlockProcessor";
-	import type { Project, TimeLog } from "../types";
-	import { formatDuration, formatDateTime } from "../utils";
+	import type { Project, TimeRecord } from "../types";
+	import { formatDuration, formatDateTime } from "../utils/timeUtils";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -26,7 +26,7 @@
 	});
 
 	let projects = $derived(getRelevantProjects());
-	let recentLogs = $derived(getRecentLogs());
+	let recentRecords = $derived(getRecentRecords());
 	let runningTimers = $derived(
 		plugin.runningTimers.filter((t) =>
 			projects.some((p) => p.id === t.projectId),
@@ -48,19 +48,19 @@
 		}
 	}
 
-	function getRecentLogs(): TimeLog[] {
+	function getRecentRecords(): TimeRecord[] {
 		const projectNames = projects.map((p) => p.name);
-		const filtered = plugin.timesheetData.logs
+		const filtered = plugin.timesheetData.records
 			.filter(
-				(l) =>
-					projectNames.includes(l.projectName) && l.endTime !== null,
+				(r) =>
+					projectNames.includes(r.projectName) && r.endTime !== null,
 			)
 			.sort((a, b) => {
 				const aEnd = a.endTime?.getTime() ?? 0;
 				const bEnd = b.endTime?.getTime() ?? 0;
 				return bEnd - aEnd;
 			})
-			.slice(0, config.recentLogs);
+			.slice(0, config.recentRecords);
 
 		return filtered;
 	}
@@ -184,33 +184,33 @@
 		</div>
 	</div>
 
-	{#if recentLogs.length > 0}
-		<div class="recent-logs">
-			<h4>Recent Logs ({config.recentLogs})</h4>
-			<div class="logs-list">
-				{#each recentLogs as log (log.id)}
-					{#if getProjectByName(log.projectName)}
-						<div class="log-item">
+	{#if recentRecords.length > 0}
+		<div class="recent-records">
+			<h4>Recent Records ({config.recentRecords})</h4>
+			<div class="records-list">
+				{#each recentRecords as record (record.id)}
+					{#if getProjectByName(record.projectName)}
+						<div class="record-item">
 							<div
-								class="log-color"
+								class="record-color"
 								style="background-color: {getProjectByName(
-									log.projectName,
+									record.projectName,
 								)?.color};"
 							></div>
-							<div class="log-info">
-								<div class="log-project">
-									{getProjectByName(log.projectName)?.icon}
-									{log.projectName}
+							<div class="record-info">
+								<div class="record-project">
+									{getProjectByName(record.projectName)?.icon}
+									{record.projectName}
 								</div>
-								<div class="log-time">
-									{formatDateTime(log.startTime)}
+								<div class="record-time">
+									{formatDateTime(record.startTime)}
 								</div>
 							</div>
-							<div class="log-duration">
-								{#if log.endTime}
+							<div class="record-duration">
+								{#if record.endTime}
 									{formatDuration(
-										log.endTime.getTime() -
-											log.startTime.getTime(),
+										record.endTime.getTime() -
+											record.startTime.getTime(),
 										true,
 									)}
 								{/if}
@@ -358,13 +358,13 @@
 		opacity: 0.9;
 	}
 
-	.logs-list {
+	.records-list {
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 	}
 
-	.log-item {
+	.record-item {
 		display: flex;
 		align-items: center;
 		padding: 8px;
@@ -373,27 +373,27 @@
 		gap: 12px;
 	}
 
-	.log-color {
+	.record-color {
 		width: 4px;
 		height: 32px;
 		border-radius: 2px;
 	}
 
-	.log-info {
+	.record-info {
 		flex: 1;
 	}
 
-	.log-project {
+	.record-project {
 		font-weight: 600;
 		margin-bottom: 2px;
 	}
 
-	.log-time {
+	.record-time {
 		color: var(--text-muted);
 		font-size: 0.85em;
 	}
 
-	.log-duration {
+	.record-duration {
 		font-weight: 600;
 		color: var(--text-muted);
 	}

@@ -2,7 +2,7 @@
  * Core data types for the Integrated Time Tracker plugin
  *
  * CSV Format:
- *   log,<id>,<projectName>,<startTime>,<endTime>,<title>
+ *   record,<id>,<projectName>,<startTime>,<endTime>,<title>
  *   project,<id>,<name>,<icon>,<color>,<archived>
  *   category,<id>,<name>,<color>,<archived>
  *
@@ -21,8 +21,8 @@ export interface Project {
 	order: number;
 }
 
-/** A time log entry - supports running timers (endTime = null) */
-export interface TimeLog {
+/** A time record entry - supports running timers (endTime = null) */
+export interface TimeRecord {
 	id: number;
 	projectName: string;
 	startTime: Date;
@@ -54,24 +54,24 @@ export interface PluginSettings {
 	showNotifications: boolean;
 	inactivityReminderDuration: number;
 	activityReminderDuration: number;
-	embeddedRecentLogsCount: number;
+	embeddedRecentRecordsCount: number;
 	sortMode: "manual" | "category" | "name" | "recent";
 	categoryFilter: number[];
 }
 
 /** Timesheet data stored in CSV */
 export interface TimesheetData {
-	logs: TimeLog[];
+	records: TimeRecord[];
 	projects: Project[];
 	categories: Category[];
 }
 
-/** Running timer - derived from logs with null endTime */
+/** Running timer - derived from records with null endTime */
 export interface RunningTimer {
 	projectId: number;
 	projectName: string;
 	startTime: Date;
-	logId: number;
+	recordId: number;
 }
 
 /** Chart data types */
@@ -91,4 +91,4 @@ export interface TimelineEntry {
 }
 
 /** CSV line types for parsing */
-export type CSVLineType = "log" | "project" | "category";
+export type CSVLineType = "record" | "project" | "category";

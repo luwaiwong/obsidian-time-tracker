@@ -66,13 +66,13 @@
 
 			case "recent": {
 				const lastUsed = new Map<number, number>();
-				for (const log of plugin.timesheetData.logs) {
-					if (log.endTime === null) continue;
-					const project = plugin.getProjectByName(log.projectName);
+				for (const record of plugin.timesheetData.records) {
+					if (record.endTime === null) continue;
+					const project = plugin.getProjectByName(record.projectName);
 					if (!project) continue;
 					const current = lastUsed.get(project.id) || 0;
-					if (log.endTime.getTime() > current) {
-						lastUsed.set(project.id, log.endTime.getTime());
+					if (record.endTime.getTime() > current) {
+						lastUsed.set(project.id, record.endTime.getTime());
 					}
 				}
 				return sorted.sort((a, b) => {

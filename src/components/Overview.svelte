@@ -2,11 +2,12 @@
 	import { setIcon } from "obsidian";
 	import { onMount, tick } from "svelte";
 	import type TimeTrackerPlugin from "../../main";
-	import type { RunningTimer, TimeLog } from "../types";
-	import { formatDuration, icon } from "../utils";
+	import type { RunningTimer, TimeRecord } from "../types";
+	import { formatDuration } from "../utils/timeUtils";
+	import { icon } from "../utils/styleUtils";
 	import { ProjectSelectorModal } from "../modals/ProjectSelectorModal";
-	import { EditLogModal } from "../modals/EditLogModal";
-	import { CSVHandler } from "../csvHandler";
+	import { EditRecordModal } from "../modals/EditRecordModal";
+	import { CSVHandler } from "../utils/csvHandler";
 	import "../../styles.css";
 
 	interface Props {
@@ -46,17 +47,19 @@
 	let currentProject = $derived(
 		currentTimer ? plugin.getProjectById(currentTimer.projectId) : null,
 	);
-	let currentLog = $derived(
+	let currentRecord = $derived(
 		currentTimer
-			? plugin.timesheetData.logs.find((l) => l.id === currentTimer.logId)
+			? plugin.timesheetData.records.find(
+					(r) => r.id === currentTimer.recordId,
+				)
 			: null,
 	);
 
-	let recentLogs = $derived(
-		plugin.timesheetData.logs
-			.filter((l) => l.endTime !== null)
+	let recentRecords = $derived(
+		plugin.timesheetData.records
+			.filter((r) => r.endTime !== null)
 			.sort((a, b) => b.endTime!.getTime() - a.endTime!.getTime())
-			.slice(0, plugin.settings.embeddedRecentLogsCount || 3),
+			.slice(0, plugin.settings.embeddedRecentRecordsCount || 3),
 	);
 
 	let timerDisplay = $derived(getTimerDisplay());
@@ -73,16 +76,16 @@
 		};
 	});
 
-	// Sync title from log when tracking starts
+	// Sync title from record when tracking starts
 	$effect(() => {
-		if (currentLog) {
-			currentTitle = currentLog.title;
+		if (currentRecord) {
+			currentTitle = currentRecord.title;
 		} else {
 			currentTitle = "";
 		}
 	});
 
-	// Set icons on mount and when recentLogs changes
+	// Set icons on mount and when recentRecords changes
 	onMount(() => {
 		if (playBtnRef) setIcon(playBtnRef, "play");
 		if (analyticsBtnRef) setIcon(analyticsBtnRef, "bar-chart-2");
@@ -112,9 +115,9 @@
 			return formatDuration(elapsed);
 		}
 
-		const lastLog = plugin.getLastStoppedLog();
-		if (lastLog?.endTime) {
-			const elapsed = currentTime - lastLog.endTime.getTime();
+		const lastRecord = plugin.getLastStoppedRecord();
+		if (lastRecord?.endTime) {
+			const elapsed = currentTime - lastRecord.endTime.getTime();
 			return formatDuration(elapsed);
 		}
 
@@ -123,18 +126,18 @@
 
 	function handlePlay(): void {
 		if (plugin.settings.retroactiveTrackingEnabled) {
-			// Retroactive mode - create a completed log
-			const lastLog = plugin.getLastStoppedLog();
+			// Retroactive mode - create a completed record
+			const lastRecord = plugin.getLastStoppedRecord();
 			const now = new Date();
-			const startTime = lastLog?.endTime || now;
-			const newLog: TimeLog = {
-				id: CSVHandler.getNextId(plugin.timesheetData.logs),
+			const startTime = lastRecord?.endTime || now;
+			const newRecord: TimeRecord = {
+				id: CSVHandler.getNextId(plugin.timesheetData.records),
 				projectName: "",
 				startTime: startTime,
 				endTime: now,
 				title: pendingTitle.trim(),
 			};
-			plugin.timesheetData.logs.push(newLog);
+			plugin.timesheetData.records.push(newRecord);
 			plugin.saveTimesheet();
 			plugin.refreshViews();
 			pendingTitle = "";
@@ -176,49 +179,49 @@
 	}
 
 	function saveTitle(): void {
-		if (!currentLog) return;
+		if (!currentRecord) return;
 
-		const index = plugin.timesheetData.logs.findIndex(
-			(l) => l.id === currentLog.id,
+		const index = plugin.timesheetData.records.findIndex(
+			(r) => r.id === currentRecord.id,
 		);
 		if (index !== -1) {
-			plugin.timesheetData.logs[index].title = currentTitle;
+			plugin.timesheetData.records[index].title = currentTitle;
 			plugin.saveTimesheet();
 		}
 	}
 
-	function handleRepeat(log: TimeLog): void {
-		const project = plugin.getProjectByName(log.projectName);
+	function handleRepeat(record: TimeRecord): void {
+		const project = plugin.getProjectByName(record.projectName);
 
 		if (plugin.settings.retroactiveTrackingEnabled) {
 			// Retroactive behavior
-			const lastLog = plugin.getLastStoppedLog();
+			const lastRecord = plugin.getLastStoppedRecord();
 			if (
-				lastLog &&
-				lastLog.projectName === log.projectName &&
-				lastLog.title === log.title
+				lastRecord &&
+				lastRecord.projectName === record.projectName &&
+				lastRecord.title === record.title
 			) {
-				// Extend last log
-				const index = plugin.timesheetData.logs.findIndex(
-					(l) => l.id === lastLog.id,
+				// Extend last record
+				const index = plugin.timesheetData.records.findIndex(
+					(r) => r.id === lastRecord.id,
 				);
 				if (index !== -1) {
-					plugin.timesheetData.logs[index].endTime = new Date();
+					plugin.timesheetData.records[index].endTime = new Date();
 					plugin.saveTimesheet();
 					plugin.refreshViews();
 				}
 			} else {
-				// Create completed log filling the gap
+				// Create completed record filling the gap
 				const now = new Date();
-				const startTime = lastLog?.endTime || now;
-				const newLog: TimeLog = {
-					id: CSVHandler.getNextId(plugin.timesheetData.logs),
-					projectName: log.projectName,
+				const startTime = lastRecord?.endTime || now;
+				const newRecord: TimeRecord = {
+					id: CSVHandler.getNextId(plugin.timesheetData.records),
+					projectName: record.projectName,
 					startTime: startTime,
 					endTime: now,
-					title: log.title,
+					title: record.title,
 				};
-				plugin.timesheetData.logs.push(newLog);
+				plugin.timesheetData.records.push(newRecord);
 				plugin.saveTimesheet();
 				plugin.refreshViews();
 			}
@@ -228,42 +231,44 @@
 				plugin.startTimer(project.id, false);
 				// Set the title after timer starts
 				setTimeout(() => {
-					const runningLog = plugin.timesheetData.logs.find(
-						(l) =>
-							l.projectName === project.name &&
-							l.endTime === null,
+					const runningRecord = plugin.timesheetData.records.find(
+						(r) =>
+							r.projectName === project.name &&
+							r.endTime === null,
 					);
-					if (runningLog) {
-						runningLog.title = log.title;
+					if (runningRecord) {
+						runningRecord.title = record.title;
 						plugin.saveTimesheet();
 						onRefresh();
 					}
 				}, 100);
 			} else {
 				// No project - start without project
-				plugin.startTimerWithoutProject(log.title);
+				plugin.startTimerWithoutProject(record.title);
 			}
 		}
 	}
 
-	function handleEdit(log: TimeLog): void {
-		new EditLogModal(plugin.app, plugin, log, onRefresh).open();
+	function handleEdit(record: TimeRecord): void {
+		new EditRecordModal(plugin.app, plugin, record, onRefresh).open();
 	}
 
-	function handleDelete(log: TimeLog): void {
-		const index = plugin.timesheetData.logs.findIndex(
-			(l) => l.id === log.id,
+	function handleDelete(record: TimeRecord): void {
+		const index = plugin.timesheetData.records.findIndex(
+			(r) => r.id === record.id,
 		);
 		if (index !== -1) {
-			plugin.timesheetData.logs.splice(index, 1);
+			plugin.timesheetData.records.splice(index, 1);
 			plugin.saveTimesheet();
 			plugin.refreshViews();
 		}
 	}
 
-	function getLogDuration(log: TimeLog): string {
-		if (!log.endTime) return "0:00";
-		return formatDuration(log.endTime.getTime() - log.startTime.getTime());
+	function getRecordDuration(record: TimeRecord): string {
+		if (!record.endTime) return "0:00";
+		return formatDuration(
+			record.endTime.getTime() - record.startTime.getTime(),
+		);
 	}
 </script>
 
@@ -317,7 +322,7 @@
 		<!-- Play/Stop Button -->
 		{#if isTracking}
 			<button
-				class="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 bg-[var(--background-modifier-hover)] hover:bg-[var(--text-error)]"
+				class="w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 bg-(--background-modifier-hover) hover:bg-(--text-error)"
 				onclick={handleStop}
 				onmouseenter={() => (isPlayButtonHovering = true)}
 				onmouseleave={() => (isPlayButtonHovering = false)}
@@ -376,7 +381,7 @@
 	</div>
 
 	<!-- Last Records Section -->
-	{#if recentLogs.length > 0}
+	{#if recentRecords.length > 0}
 		<div class="pb-3">
 			<div
 				class="text-[10px] text-(--text-faint) uppercase tracking-wider mb-1.5"
@@ -384,8 +389,10 @@
 				Last Records
 			</div>
 			<div class="flex flex-col gap-1">
-				{#each recentLogs as log (log.id)}
-					{@const project = plugin.getProjectByName(log.projectName)}
+				{#each recentRecords as record (record.id)}
+					{@const project = plugin.getProjectByName(
+						record.projectName,
+					)}
 					<div
 						class="flex items-center gap-2 py-1.5rounded hover:bg-[var(--background-modifier-hover)]"
 					>
@@ -411,14 +418,14 @@
 								<span class="text-sm font-medium shrink-0"
 									>{project.name}</span
 								>
-								{#if log.title}
+								{#if record.title}
 									<span
 										class="text-sm text-[var(--text-muted)]"
 										>·</span
 									>
 									<span
 										class="text-sm text-[var(--text-muted)] truncate"
-										>{log.title}</span
+										>{record.title}</span
 									>
 								{/if}
 							{:else}
@@ -426,14 +433,14 @@
 									class="text-sm text-[var(--text-faint)] italic shrink-0"
 									>No project</span
 								>
-								{#if log.title}
+								{#if record.title}
 									<span
 										class="text-sm text-[var(--text-muted)]"
 										>·</span
 									>
 									<span
 										class="text-sm text-[var(--text-normal)] truncate"
-										>{log.title}</span
+										>{record.title}</span
 									>
 								{/if}
 							{/if}
@@ -442,33 +449,33 @@
 						<div
 							class="text-s text-[var(--text-muted)] tabular-nums pr-2"
 						>
-							{getLogDuration(log)}
+							{getRecordDuration(record)}
 						</div>
 						<!-- Action buttons -->
 						<button
 							class="size-12 rounded p-0"
 							aria-label="Repeat"
-							onclick={() => handleRepeat(log)}
+							onclick={() => handleRepeat(record)}
 							{@attach icon("repeat")}
 						>
 						</button>
 						<button
 							class="size-12 rounded p-0"
 							aria-label="Edit"
-							onclick={() => handleEdit(log)}
+							onclick={() => handleEdit(record)}
 							{@attach icon("pencil")}
 						>
 						</button>
 						<!-- <button
 							class="size-10 rounded p-0"
 							aria-label="Edit"
-							onclick={() => handleEdit(log)}
+							onclick={() => handleEdit(record)}
 							{@attach icon("pencil")}
 						></button> -->
 						<!-- <button
 							class="size-12 rounded hover:bg-[var(--background-modifier-hover)]"
 							aria-label="Delete"
-							onclick={() => handleDelete(log)}
+							onclick={() => handleDelete(record)}
 							use:iconAction={"trash-2"}
 						>
 						</button> -->

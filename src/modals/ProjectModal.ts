@@ -1,7 +1,7 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
-import { CSVHandler } from "../csvHandler";
+import { CSVHandler } from "../utils/csvHandler";
 
 export class ProjectModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -136,11 +136,11 @@ export class ProjectModal extends Modal {
 			this.project.color = this.colorInput;
 			this.project.categoryId = this.categoryId;
 
-			// Update all logs that reference the old project name
+			// Update all records that reference the old project name
 			if (oldName !== newName) {
-				for (const log of this.plugin.timesheetData.logs) {
-					if (log.projectName === oldName) {
-						log.projectName = newName;
+				for (const record of this.plugin.timesheetData.records) {
+					if (record.projectName === oldName) {
+						record.projectName = newName;
 					}
 				}
 			}

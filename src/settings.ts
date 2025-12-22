@@ -203,10 +203,10 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.addSlider((slider) =>
 				slider
 					.setLimits(1, 20, 1)
-					.setValue(this.plugin.settings.embeddedRecentLogsCount)
+					.setValue(this.plugin.settings.embeddedRecentRecordsCount)
 					.setDynamicTooltip()
 					.onChange(async (value) => {
-						this.plugin.settings.embeddedRecentLogsCount = value;
+						this.plugin.settings.embeddedRecentRecordsCount = value;
 						await this.refreshAndSavePlugin();
 					}),
 			);

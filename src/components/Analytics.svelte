@@ -7,7 +7,7 @@
 		getProjectDuration,
 		getTimeRange,
 		formatDate,
-	} from "../utils";
+	} from "../utils/timeUtils";
 	import { Chart, registerables } from "chart.js";
 
 	interface Props {
@@ -89,7 +89,7 @@
 				label: project.name,
 				value: getProjectDuration(
 					project.name,
-					plugin.timesheetData.logs,
+					plugin.timesheetData.records,
 					start,
 					end,
 				),
@@ -171,20 +171,20 @@
 			});
 		}
 
-		plugin.timesheetData.logs.forEach((log) => {
-			if (log.endTime === null) return;
-			const logEnd = log.endTime.getTime();
-			const logStart = log.startTime.getTime();
-			if (logEnd < start || logStart > end) return;
+		plugin.timesheetData.records.forEach((record) => {
+			if (record.endTime === null) return;
+			const recordEnd = record.endTime.getTime();
+			const recordStart = record.startTime.getTime();
+			if (recordEnd < start || recordStart > end) return;
 
-			const project = plugin.getProjectByName(log.projectName);
+			const project = plugin.getProjectByName(record.projectName);
 			if (!project || !projects.some((p) => p.id === project.id)) return;
 
-			const recordDate = new Date(logStart);
+			const recordDate = new Date(recordStart);
 			const key = formatDate(recordDate.getTime());
 
 			if (days[key]) {
-				const duration = logEnd - logStart;
+				const duration = recordEnd - recordStart;
 				days[key][project.id] = (days[key][project.id] || 0) + duration;
 			}
 		});
@@ -341,7 +341,7 @@
 				total +
 				getProjectDuration(
 					project.name,
-					plugin.timesheetData.logs,
+					plugin.timesheetData.records,
 					start,
 					end,
 				)

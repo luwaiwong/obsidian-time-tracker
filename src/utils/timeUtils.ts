@@ -3,7 +3,7 @@
  */
 
 import { Attachment } from "svelte/attachments";
-import type { TimeLog } from "./types";
+import type { TimeRecord } from "../types";
 import { setIcon } from "obsidian";
 
 /**
@@ -36,28 +36,30 @@ export function formatDuration(
 
 /**
  * Get total duration for a project within a time range
- * Works with the new TimeLog structure (uses projectName and Date objects)
+ * Works with the TimeRecord structure (uses projectName and Date objects)
  */
 export function getProjectDuration(
 	projectName: string,
-	logs: TimeLog[],
+	records: TimeRecord[],
 	startTime?: number,
 	endTime?: number,
 ): number {
-	return logs
-		.filter((l) => l.projectName === projectName && l.endTime !== null)
-		.filter((l) => {
-			const logEnd = l.endTime!.getTime();
-			const logStart = l.startTime.getTime();
-			if (startTime && logEnd < startTime) return false;
-			if (endTime && logStart > endTime) return false;
+	return records
+		.filter((r) => r.projectName === projectName && r.endTime !== null)
+		.filter((r) => {
+			const recordEnd = r.endTime!.getTime();
+			const recordStart = r.startTime.getTime();
+			if (startTime && recordEnd < startTime) return false;
+			if (endTime && recordStart > endTime) return false;
 			return true;
 		})
-		.reduce((total, log) => {
-			const logStart = log.startTime.getTime();
-			const logEnd = log.endTime!.getTime();
-			const start = startTime ? Math.max(logStart, startTime) : logStart;
-			const end = endTime ? Math.min(logEnd, endTime) : logEnd;
+		.reduce((total, record) => {
+			const recordStart = record.startTime.getTime();
+			const recordEnd = record.endTime!.getTime();
+			const start = startTime
+				? Math.max(recordStart, startTime)
+				: recordStart;
+			const end = endTime ? Math.min(recordEnd, endTime) : recordEnd;
 			return total + (end - start);
 		}, 0);
 }
@@ -67,14 +69,14 @@ export function getProjectDuration(
  */
 export function getProjectDurationById(
 	projectId: number,
-	logs: TimeLog[],
+	records: TimeRecord[],
 	projectsMap: Map<number, string>,
 	startTime?: number,
 	endTime?: number,
 ): number {
 	const projectName = projectsMap.get(projectId);
 	if (!projectName) return 0;
-	return getProjectDuration(projectName, logs, startTime, endTime);
+	return getProjectDuration(projectName, records, startTime, endTime);
 }
 
 /**
@@ -144,10 +146,4 @@ export function formatTimeOfDay(timestamp: number | Date): string {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
-}
-
-export function icon(iconName: string): Attachment<HTMLElement> {
-	return (node: HTMLElement) => {
-		setIcon(node, iconName);
-	};
 }

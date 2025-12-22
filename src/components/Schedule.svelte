@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { Project } from "../types";
-	import { formatDuration } from "../utils";
+	import { formatDuration } from "../utils/timeUtils";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -27,7 +27,7 @@
 	let now = $state(Date.now());
 	let interval: number | undefined;
 	let projects = $derived(plugin.timesheetData?.projects ?? []);
-	let logs = $derived(plugin.timesheetData?.logs ?? []);
+	let records = $derived(plugin.timesheetData?.records ?? []);
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
@@ -101,22 +101,22 @@
 		const items: ScheduleBlock[] = [];
 		if (dayLength <= 0 || projects.length === 0) return items;
 
-		// Process completed logs
-		for (const log of logs) {
-			if (log.endTime === null) continue;
-			const logStart = log.startTime.getTime();
-			const logEnd = log.endTime.getTime();
-			if (logEnd < start || logStart > end) continue;
+		// Process completed records
+		for (const record of records) {
+			if (record.endTime === null) continue;
+			const recordStart = record.startTime.getTime();
+			const recordEnd = record.endTime.getTime();
+			if (recordEnd < start || recordStart > end) continue;
 
-			const project = plugin.getProjectByName(log.projectName);
+			const project = plugin.getProjectByName(record.projectName);
 			if (!project) continue;
 
-			const clampedStart = Math.max(logStart, start);
-			const clampedEnd = Math.min(logEnd, end);
+			const clampedStart = Math.max(recordStart, start);
+			const clampedEnd = Math.min(recordEnd, end);
 
 			items.push(
 				buildBlock(
-					`log-${log.id}`,
+					`record-${record.id}`,
 					project,
 					clampedStart,
 					clampedEnd,

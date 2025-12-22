@@ -27,7 +27,7 @@ export class TimeTrackerCodeBlockProcessor {
 			type: "all",
 			projectId: null,
 			categoryId: null,
-			recentLogs: 5,
+			recentRecords: 5,
 			showRunningTimer: true,
 			size: "normal",
 		};
@@ -71,8 +71,8 @@ export class TimeTrackerCodeBlockProcessor {
 					}
 					break;
 				}
-				case "recentlogs":
-					config.recentLogs = parseInt(value);
+				case "recentrecords":
+					config.recentRecords = parseInt(value);
 					break;
 				case "showtimer":
 					config.showRunningTimer = value.toLowerCase() === "true";
@@ -91,7 +91,7 @@ export interface EmbeddedTrackerConfig {
 	type: "all" | "project" | "category";
 	projectId: number | null;
 	categoryId: number | null;
-	recentLogs: number;
+	recentRecords: number;
 	showRunningTimer: boolean;
 	size: "small" | "normal" | "large";
 }

@@ -1,17 +1,17 @@
 import { TFile, Vault } from "obsidian";
 import type {
 	Project,
-	TimeLog,
+	TimeRecord,
 	Category,
 	TimesheetData,
 	CSVLineType,
-} from "./types";
+} from "../types";
 
 /**
  * Handles reading and writing the timesheet.csv file.
  *
- * CSV Format (human-readable):
- *   log,<id>,<projectName>,<startTime>,<endTime>,<title>
+ * CSV Format:
+ *   record,<id>,<projectName>,<startTime>,<endTime>,<title>
  *   project,<id>,<name>,<icon>,<color>,<archived>
  *   category,<id>,<name>,<color>,<archived>
  *
@@ -28,7 +28,7 @@ export class CSVHandler {
 			.filter((line) => line.trim().length > 0);
 
 		const data: TimesheetData = {
-			logs: [],
+			records: [],
 			projects: [],
 			categories: [],
 		};
@@ -40,8 +40,8 @@ export class CSVHandler {
 			const type = parts[0] as CSVLineType;
 
 			switch (type) {
-				case "log":
-					this.parseLog(parts, data);
+				case "record":
+					this.parseRecord(parts, data);
 					break;
 				case "project":
 					this.parseProject(parts, data);
@@ -55,8 +55,8 @@ export class CSVHandler {
 		return data;
 	}
 
-	private parseLog(parts: string[], data: TimesheetData): void {
-		// Format: log,id,projectName,startTime,endTime,title
+	private parseRecord(parts: string[], data: TimesheetData): void {
+		// Format: record,id,projectName,startTime,endTime,title
 		if (parts.length < 5) return;
 
 		const id = parseInt(parts[1]);
@@ -71,7 +71,7 @@ export class CSVHandler {
 		// endTime can be empty for running timers
 		const endTime = endTimeStr ? this.parseDateTime(endTimeStr) : null;
 
-		data.logs.push({
+		data.records.push({
 			id,
 			projectName,
 			startTime,
@@ -234,21 +234,21 @@ export class CSVHandler {
 			);
 		}
 
-		// Write logs
-		for (const log of data.logs) {
-			const startTimeStr = this.formatDateTime(log.startTime);
-			const endTimeStr = log.endTime
-				? this.formatDateTime(log.endTime)
+		// Write records
+		for (const record of data.records) {
+			const startTimeStr = this.formatDateTime(record.startTime);
+			const endTimeStr = record.endTime
+				? this.formatDateTime(record.endTime)
 				: "";
 
 			lines.push(
 				[
-					"log",
-					log.id,
-					this.escapeCSVField(log.projectName),
+					"record",
+					record.id,
+					this.escapeCSVField(record.projectName),
 					startTimeStr,
 					endTimeStr,
-					this.escapeCSVField(log.title),
+					this.escapeCSVField(record.title),
 				].join(","),
 			);
 		}
@@ -259,7 +259,7 @@ export class CSVHandler {
 
 	async createTimesheet(path: string): Promise<TFile> {
 		const initialData: TimesheetData = {
-			logs: [],
+			records: [],
 			projects: [],
 			categories: [
 				{

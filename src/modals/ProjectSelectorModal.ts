@@ -1,9 +1,9 @@
 import { App, Modal, Setting, Notice, setIcon } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import type { Project, TimeLog } from "../types";
+import type { Project, TimeRecord } from "../types";
 import { ProjectModal } from "./ProjectModal";
-import { CSVHandler } from "../csvHandler";
-import { formatDuration, formatDateTime } from "../utils";
+import { CSVHandler } from "../utils/csvHandler";
+import { formatDuration, formatDateTime } from "../utils/timeUtils";
 import ProjectSelectorGrid from "../components/ProjectSelectorGrid.svelte";
 import { mount, unmount } from "svelte";
 
@@ -14,7 +14,7 @@ export class ProjectSelectorModal extends Modal {
 
 	private titleInput: string = "";
 	private selectedProject: Project | null = null;
-	private lastLog: TimeLog | null = null;
+	private lastRecord: TimeRecord | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
 	private titleInputEl: HTMLInputElement | null = null;
 
@@ -30,7 +30,7 @@ export class ProjectSelectorModal extends Modal {
 		this.onComplete = onComplete;
 		this.isSwitching = isSwitching;
 		this.titleInput = initialTitle;
-		this.lastLog = plugin.getLastStoppedLog();
+		this.lastRecord = plugin.getLastStoppedRecord();
 	}
 
 	onOpen() {
@@ -43,13 +43,13 @@ export class ProjectSelectorModal extends Modal {
 		// Show retroactive info if enabled
 		if (
 			this.plugin.settings.retroactiveTrackingEnabled &&
-			this.lastLog?.endTime
+			this.lastRecord?.endTime
 		) {
 			const now = new Date();
-			const gap = now.getTime() - this.lastLog.endTime.getTime();
+			const gap = now.getTime() - this.lastRecord.endTime.getTime();
 			const infoEl = contentEl.createDiv("retroactive-info");
 			infoEl.setText(
-				`Will fill: ${formatDateTime(this.lastLog.endTime)} to now (${formatDuration(gap)})`,
+				`Will fill: ${formatDateTime(this.lastRecord.endTime)} to now (${formatDuration(gap)})`,
 			);
 		}
 
@@ -66,10 +66,10 @@ export class ProjectSelectorModal extends Modal {
 					});
 			});
 
-		// Repeat last button (if there's a last log)
-		if (this.lastLog) {
+		// Repeat last button (if there's a last record)
+		if (this.lastRecord) {
 			const lastProject = this.plugin.getProjectByName(
-				this.lastLog.projectName,
+				this.lastRecord.projectName,
 			);
 			if (lastProject) {
 				const repeatSetting = new Setting(contentEl);
@@ -84,12 +84,12 @@ export class ProjectSelectorModal extends Modal {
 				setIcon(iconSpan, "repeat");
 
 				repeatBtn.createSpan({
-					text: `Repeat: ${lastProject.name}${this.lastLog.title ? ` - ${this.lastLog.title}` : ""}`,
+					text: `Repeat: ${lastProject.name}${this.lastRecord.title ? ` - ${this.lastRecord.title}` : ""}`,
 				});
 
 				repeatBtn.addEventListener("click", () => {
 					this.selectedProject = lastProject;
-					this.titleInput = this.lastLog?.title || "";
+					this.titleInput = this.lastRecord?.title || "";
 					if (this.titleInputEl) {
 						this.titleInputEl.value = this.titleInput;
 					}
@@ -114,7 +114,7 @@ export class ProjectSelectorModal extends Modal {
 				selectedProjectId: this.selectedProject?.id || null,
 				onSelect: (project: Project) => {
 					this.selectedProject = project;
-					// Auto-fill title from last log of same project if empty
+					// Auto-fill title from last record of same project if empty
 					if (!this.titleInput) {
 						this.autoFillTitle(project);
 					}
@@ -172,7 +172,7 @@ export class ProjectSelectorModal extends Modal {
 		});
 
 		const actionText = this.plugin.settings.retroactiveTrackingEnabled
-			? "Log Time"
+			? "Record Time"
 			: "Start";
 		const saveButton = buttonContainer.createEl("button", {
 			text: actionText,
@@ -209,12 +209,12 @@ export class ProjectSelectorModal extends Modal {
 	}
 
 	private autoFillTitle(project: Project): void {
-		const projectLogs = this.plugin.timesheetData.logs
-			.filter((l) => l.projectName === project.name && l.endTime !== null)
+		const projectRecords = this.plugin.timesheetData.records
+			.filter((r) => r.projectName === project.name && r.endTime !== null)
 			.sort((a, b) => b.endTime!.getTime() - a.endTime!.getTime());
 
-		if (projectLogs.length > 0 && projectLogs[0].title) {
-			this.titleInput = projectLogs[0].title;
+		if (projectRecords.length > 0 && projectRecords[0].title) {
+			this.titleInput = projectRecords[0].title;
 			if (this.titleInputEl) {
 				this.titleInputEl.value = this.titleInput;
 			}
@@ -247,44 +247,44 @@ export class ProjectSelectorModal extends Modal {
 		}
 
 		if (this.plugin.settings.retroactiveTrackingEnabled) {
-			// Retroactive mode: create completed log
-			const lastLog = this.lastLog;
+			// Retroactive mode: create completed record
+			const lastRecord = this.lastRecord;
 
-			if (lastLog?.endTime) {
-				// Check if same project and same title - extend last log
+			if (lastRecord?.endTime) {
+				// Check if same project and same title - extend last record
 				if (
-					lastLog.projectName === this.selectedProject.name &&
-					lastLog.title === this.titleInput.trim()
+					lastRecord.projectName === this.selectedProject.name &&
+					lastRecord.title === this.titleInput.trim()
 				) {
-					const index = this.plugin.timesheetData.logs.findIndex(
-						(l) => l.id === lastLog.id,
+					const index = this.plugin.timesheetData.records.findIndex(
+						(r) => r.id === lastRecord.id,
 					);
 					if (index !== -1) {
-						this.plugin.timesheetData.logs[index].endTime = now;
+						this.plugin.timesheetData.records[index].endTime = now;
 					}
 				} else {
-					// Create new completed log filling the gap
-					const newLog: TimeLog = {
+					// Create new completed record filling the gap
+					const newRecord: TimeRecord = {
 						id: CSVHandler.getNextId(
-							this.plugin.timesheetData.logs,
+							this.plugin.timesheetData.records,
 						),
 						projectName: this.selectedProject.name,
-						startTime: lastLog.endTime,
+						startTime: lastRecord.endTime,
 						endTime: now,
 						title: this.titleInput.trim(),
 					};
-					this.plugin.timesheetData.logs.push(newLog);
+					this.plugin.timesheetData.records.push(newRecord);
 				}
 			} else {
-				// No previous log - create minimal entry
-				const newLog: TimeLog = {
-					id: CSVHandler.getNextId(this.plugin.timesheetData.logs),
+				// No previous record - create minimal entry
+				const newRecord: TimeRecord = {
+					id: CSVHandler.getNextId(this.plugin.timesheetData.records),
 					projectName: this.selectedProject.name,
 					startTime: now,
 					endTime: now,
 					title: this.titleInput.trim(),
 				};
-				this.plugin.timesheetData.logs.push(newLog);
+				this.plugin.timesheetData.records.push(newRecord);
 			}
 
 			await this.plugin.saveTimesheet();
@@ -296,13 +296,14 @@ export class ProjectSelectorModal extends Modal {
 			// Set the title if provided
 			if (this.titleInput.trim()) {
 				setTimeout(() => {
-					const runningLog = this.plugin.timesheetData.logs.find(
-						(l) =>
-							l.projectName === this.selectedProject!.name &&
-							l.endTime === null,
-					);
-					if (runningLog) {
-						runningLog.title = this.titleInput.trim();
+					const runningRecord =
+						this.plugin.timesheetData.records.find(
+							(r) =>
+								r.projectName === this.selectedProject!.name &&
+								r.endTime === null,
+						);
+					if (runningRecord) {
+						runningRecord.title = this.titleInput.trim();
 						this.plugin.saveTimesheet();
 						this.plugin.refreshViews();
 					}
