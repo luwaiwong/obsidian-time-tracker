@@ -10,7 +10,6 @@
  * Running timers have an empty endTime field.
  */
 
-/** A project that can be tracked */
 export interface Project {
 	id: number;
 	name: string;
@@ -21,10 +20,9 @@ export interface Project {
 	order: number;
 }
 
-/** A time record entry - supports running timers (endTime = null) */
 export interface TimeRecord {
 	id: number;
-	projectName: string;
+	projectId: number;
 	startTime: Date;
 	endTime: Date | null;
 	title: string;
@@ -59,22 +57,12 @@ export interface PluginSettings {
 	categoryFilter: number[];
 }
 
-/** Timesheet data stored in CSV */
 export interface TimesheetData {
 	records: TimeRecord[];
 	projects: Project[];
 	categories: Category[];
 }
 
-/** Running timer - derived from records with null endTime */
-export interface RunningTimer {
-	projectId: number;
-	projectName: string;
-	startTime: Date;
-	recordId: number;
-}
-
-/** Chart data types */
 export interface ChartDataPoint {
 	label: string;
 	value: number;
@@ -90,5 +78,4 @@ export interface TimelineEntry {
 	color: string;
 }
 
-/** CSV line types for parsing */
 export type CSVLineType = "record" | "project" | "category";

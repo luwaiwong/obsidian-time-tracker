@@ -9,6 +9,24 @@ If your plugin does not need CSS, delete this file.
 
 @import "tailwindcss";
 
+/* View container */
+.time-tracker-view {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+.time-tracker-header {
+	flex-shrink: 0;
+}
+
+.time-tracker-content {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
 /* Loading and error states */
 .time-tracker-loading,
 .time-tracker-error {

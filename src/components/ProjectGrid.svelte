@@ -1,19 +1,30 @@
 <script lang="ts">
 	import ProjectCard from "./ProjectCard.svelte";
-	import type { Project, RunningTimer } from "../types";
+	import type { Project, TimeRecord } from "../types";
 	import type TimeTrackerPlugin from "../../main";
+	import { on } from "svelte/events";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
-		projects: Project[];
-		runningTimers: RunningTimer[];
+		projects?: Project[];
+		runningTimers?: TimeRecord[];
 		gridColumns?: number;
+		onProjectClick?: (project: Project) => void;
+		selectedProjectId?: number | null;
+		selectionMode?: boolean;
 	}
-
-	let { plugin, projects, runningTimers, gridColumns = 5 }: Props = $props();
+	let {
+		plugin,
+		gridColumns = plugin.settings.gridColumns,
+		onProjectClick,
+		selectedProjectId = null,
+		selectionMode = false,
+	}: Props = $props();
 
 	let currentTime = $state(Date.now());
 	let interval: number | undefined;
+	let projects = plugin.timesheetData.projects;
+	let runningTimers = plugin.runningTimers;
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
@@ -27,15 +38,17 @@
 	});
 
 	function handleProjectClick(project: Project) {
+		if (onProjectClick) {
+			onProjectClick(project);
+			return;
+		}
+
 		const isRunning = isProjectRunning(project.id);
 
 		if (isRunning) {
 			plugin.stopTimer(project.id);
 		} else {
-			plugin.startTimer(
-				project.id,
-				plugin.settings.retroactiveTrackingEnabled,
-			);
+			plugin.startTimer(project.id);
 		}
 	}
 
@@ -68,11 +81,12 @@
 				const lastUsed = new Map<number, number>();
 				for (const record of plugin.timesheetData.records) {
 					if (record.endTime === null) continue;
-					const project = plugin.getProjectByName(record.projectName);
-					if (!project) continue;
-					const current = lastUsed.get(project.id) || 0;
+					const current = lastUsed.get(record.projectId) || 0;
 					if (record.endTime.getTime() > current) {
-						lastUsed.set(project.id, record.endTime.getTime());
+						lastUsed.set(
+							record.projectId,
+							record.endTime.getTime(),
+						);
 					}
 				}
 				return sorted.sort((a, b) => {
@@ -101,15 +115,16 @@
 	);
 </script>
 
-<div class="container">
-	<div class="project-grid" style={gridStyle}>
+<div class="p-4">
+	<div class="grid w-full gap-4" style={gridStyle}>
 		{#each visibleProjects as project (project.id)}
 			<ProjectCard
 				{project}
-				isRunning={isProjectRunning(project.id)}
-				currentDuration={getRunningDuration(project.id)}
-				onStart={() => plugin.startTimer(project.id)}
-				onStop={() => plugin.stopTimer(project.id)}
+				isRunning={selectionMode ? false : isProjectRunning(project.id)}
+				isSelected={selectionMode && selectedProjectId === project.id}
+				currentDuration={selectionMode
+					? 0
+					: getRunningDuration(project.id)}
 				onClick={() => handleProjectClick(project)}
 				{gridColumns}
 			/>
@@ -117,37 +132,11 @@
 	</div>
 
 	{#if visibleProjects.length === 0}
-		<div class="empty-state">
-			<p>No projects yet!</p>
-			<p class="empty-state-hint">
+		<div class="px-4 py-12 text-center text-[var(--text-muted)]">
+			<p class="my-2">No projects yet!</p>
+			<p class="my-2 text-sm opacity-80">
 				Create a project to start tracking time.
 			</p>
 		</div>
 	{/if}
 </div>
-
-<style>
-	.container {
-		padding: 16px;
-	}
-	.project-grid {
-		display: grid;
-		gap: 16px;
-		width: 100%;
-	}
-
-	.empty-state {
-		padding: 48px 16px;
-		text-align: center;
-		color: var(--text-muted);
-	}
-
-	.empty-state p {
-		margin: 8px 0;
-	}
-
-	.empty-state-hint {
-		font-size: 0.9em;
-		opacity: 0.8;
-	}
-</style>

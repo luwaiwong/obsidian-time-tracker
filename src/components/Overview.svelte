@@ -2,7 +2,7 @@
 	import { setIcon } from "obsidian";
 	import { onMount, tick } from "svelte";
 	import type TimeTrackerPlugin from "../../main";
-	import type { RunningTimer, TimeRecord } from "../types";
+	import type { TimeRecord } from "../types";
 	import { formatDuration } from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { ProjectSelectorModal } from "../modals/ProjectSelectorModal";
@@ -12,7 +12,7 @@
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
-		runningTimers: RunningTimer[];
+		runningTimers: TimeRecord[];
 		onOpenAnalytics: () => void;
 		onOpenSettings: () => void;
 		onRefresh: () => void;
@@ -49,9 +49,7 @@
 	);
 	let currentRecord = $derived(
 		currentTimer
-			? plugin.timesheetData.records.find(
-					(r) => r.id === currentTimer.recordId,
-				)
+			? plugin.timesheetData.records.find((r) => r.id === currentTimer.id)
 			: null,
 	);
 
@@ -125,27 +123,8 @@
 	}
 
 	function handlePlay(): void {
-		if (plugin.settings.retroactiveTrackingEnabled) {
-			// Retroactive mode - create a completed record
-			const lastRecord = plugin.getLastStoppedRecord();
-			const now = new Date();
-			const startTime = lastRecord?.endTime || now;
-			const newRecord: TimeRecord = {
-				id: CSVHandler.getNextId(plugin.timesheetData.records),
-				projectName: "",
-				startTime: startTime,
-				endTime: now,
-				title: pendingTitle.trim(),
-			};
-			plugin.timesheetData.records.push(newRecord);
-			plugin.saveTimesheet();
-			plugin.refreshViews();
-			pendingTitle = "";
-		} else {
-			// Normal mode - start tracking without project
-			plugin.startTimerWithoutProject(pendingTitle.trim());
-			pendingTitle = "";
-		}
+		plugin.startTimerWithoutProject(pendingTitle.trim());
+		pendingTitle = "";
 	}
 
 	function handleStop(): void {
@@ -162,13 +141,27 @@
 	}
 
 	function openProjectSelector(): void {
-		new ProjectSelectorModal(
-			plugin.app,
-			plugin,
-			onRefresh,
-			isTracking,
-			isTracking ? currentTitle : pendingTitle.trim(),
-		).open();
+		if (runningTimers.length > 0) {
+			new ProjectSelectorModal(
+				plugin.app,
+				plugin,
+				onRefresh,
+				isTracking,
+				isTracking ? currentTitle : pendingTitle.trim(),
+				plugin.timesheetData.projects.find(
+					(project) => project.id === runningTimers[0].projectId,
+				),
+			).open();
+		} else {
+			new ProjectSelectorModal(
+				plugin.app,
+				plugin,
+				onRefresh,
+				isTracking,
+				isTracking ? currentTitle : pendingTitle.trim(),
+				null,
+			).open();
+		}
 	}
 
 	function debouncedSaveTitle(): void {
@@ -191,14 +184,14 @@
 	}
 
 	function handleRepeat(record: TimeRecord): void {
-		const project = plugin.getProjectByName(record.projectName);
+		const project = plugin.getProjectById(record.projectId);
 
 		if (plugin.settings.retroactiveTrackingEnabled) {
 			// Retroactive behavior
 			const lastRecord = plugin.getLastStoppedRecord();
 			if (
 				lastRecord &&
-				lastRecord.projectName === record.projectName &&
+				lastRecord.projectId === record.projectId &&
 				lastRecord.title === record.title
 			) {
 				// Extend last record
@@ -216,7 +209,7 @@
 				const startTime = lastRecord?.endTime || now;
 				const newRecord: TimeRecord = {
 					id: CSVHandler.getNextId(plugin.timesheetData.records),
-					projectName: record.projectName,
+					projectId: record.projectId,
 					startTime: startTime,
 					endTime: now,
 					title: record.title,
@@ -228,13 +221,11 @@
 		} else {
 			// Normal mode - start new timer
 			if (project) {
-				plugin.startTimer(project.id, false);
+				plugin.startTimer(project.id);
 				// Set the title after timer starts
 				setTimeout(() => {
 					const runningRecord = plugin.timesheetData.records.find(
-						(r) =>
-							r.projectName === project.name &&
-							r.endTime === null,
+						(r) => r.projectId === project.id && r.endTime === null,
 					);
 					if (runningRecord) {
 						runningRecord.title = record.title;
@@ -296,7 +287,7 @@
 				onclick={openProjectSelector}
 				aria-label="Select project"
 			>
-				<span class="text-md">Select Project</span>
+				<span class="text-md">Track Project</span>
 			</button>
 		{/if}
 
@@ -355,7 +346,7 @@
 					type="text"
 					class="w-full bg-transparent border-none outline-none text-[var(--text-normal)] placeholder:text-[var(--text-muted)] text-lg"
 					placeholder={plugin.settings.retroactiveTrackingEnabled
-						? "Track retroactively"
+						? "Track BRUH"
 						: "What will you work on?"}
 					bind:value={pendingTitle}
 					onkeydown={handleTitleKeydown}
@@ -365,13 +356,8 @@
 
 		<!-- Right: Timer Display -->
 		<div class="shrink-0 text-right min-w-16">
-			{#if !isTracking}
-				<div class="text-[9px] text-[var(--text-faint)]">
-					elapsed time
-				</div>
-			{/if}
 			<div
-				class="text-1xl tabular-nums {isTracking
+				class="text-2xl tabular-nums {isTracking
 					? 'text-[var(--text-normal)]'
 					: 'text-[var(--text-faint)]'}"
 			>
@@ -390,9 +376,7 @@
 			</div>
 			<div class="flex flex-col gap-1">
 				{#each recentRecords as record (record.id)}
-					{@const project = plugin.getProjectByName(
-						record.projectName,
-					)}
+					{@const project = plugin.getProjectById(record.projectId)}
 					<div
 						class="flex items-center gap-2 py-1.5rounded hover:bg-[var(--background-modifier-hover)]"
 					>

@@ -5,9 +5,8 @@
 	interface Props {
 		project: Project;
 		isRunning?: boolean;
+		isSelected?: boolean;
 		currentDuration?: number;
-		onStart: () => void;
-		onStop: () => void;
 		onClick: () => void;
 		gridColumns?: number;
 	}
@@ -15,9 +14,8 @@
 	let {
 		project,
 		isRunning = false,
+		isSelected = false,
 		currentDuration = 0,
-		onStart,
-		onStop,
 		onClick,
 		gridColumns = 5,
 	}: Props = $props();
@@ -37,6 +35,7 @@
 <div
 	class="project-card"
 	class:running={isRunning}
+	class:selected={isSelected}
 	style="background-color: {project.color}; font-size: {baseFontSize}px;"
 	onclick={onClick}
 	onkeydown={(e) => e.key === "Enter" && onClick()}
@@ -79,6 +78,10 @@
 	.project-card.running {
 		animation: pulse 2s ease-in-out infinite;
 		box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+	}
+
+	.project-card.selected {
+		box-shadow: 0 0 0 3px var(--interactive-accent);
 	}
 
 	@keyframes pulse {

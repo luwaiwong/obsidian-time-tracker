@@ -49,11 +49,10 @@
 	}
 
 	function getRecentRecords(): TimeRecord[] {
-		const projectNames = projects.map((p) => p.name);
+		const projectIds = projects.map((p) => p.id);
 		const filtered = plugin.timesheetData.records
 			.filter(
-				(r) =>
-					projectNames.includes(r.projectName) && r.endTime !== null,
+				(r) => projectIds.includes(r.projectId) && r.endTime !== null,
 			)
 			.sort((a, b) => {
 				const aEnd = a.endTime?.getTime() ?? 0;
@@ -86,10 +85,7 @@
 		if (isRunning) {
 			plugin.stopTimer(project.id);
 		} else {
-			plugin.startTimer(
-				project.id,
-				plugin.settings.retroactiveTrackingEnabled,
-			);
+			plugin.startTimer(project.id);
 		}
 	}
 
@@ -189,18 +185,17 @@
 			<h4>Recent Records ({config.recentRecords})</h4>
 			<div class="records-list">
 				{#each recentRecords as record (record.id)}
-					{#if getProjectByName(record.projectName)}
+					{@const project = getProject(record.projectId)}
+					{#if project}
 						<div class="record-item">
 							<div
 								class="record-color"
-								style="background-color: {getProjectByName(
-									record.projectName,
-								)?.color};"
+								style="background-color: {project.color};"
 							></div>
 							<div class="record-info">
 								<div class="record-project">
-									{getProjectByName(record.projectName)?.icon}
-									{record.projectName}
+									{project.icon}
+									{project.name}
 								</div>
 								<div class="record-time">
 									{formatDateTime(record.startTime)}

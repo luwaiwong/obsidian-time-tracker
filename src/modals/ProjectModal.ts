@@ -135,15 +135,6 @@ export class ProjectModal extends Modal {
 			this.project.icon = this.iconInput.trim();
 			this.project.color = this.colorInput;
 			this.project.categoryId = this.categoryId;
-
-			// Update all records that reference the old project name
-			if (oldName !== newName) {
-				for (const record of this.plugin.timesheetData.records) {
-					if (record.projectName === oldName) {
-						record.projectName = newName;
-					}
-				}
-			}
 		} else {
 			const newId = CSVHandler.getNextId(
 				this.plugin.timesheetData.projects,

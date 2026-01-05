@@ -2,9 +2,7 @@
  * Utility functions for the time tracker plugin
  */
 
-import { Attachment } from "svelte/attachments";
 import type { TimeRecord } from "../types";
-import { setIcon } from "obsidian";
 
 /**
  * Format duration in milliseconds to human-readable string
@@ -36,16 +34,16 @@ export function formatDuration(
 
 /**
  * Get total duration for a project within a time range
- * Works with the TimeRecord structure (uses projectName and Date objects)
+ * Works with the TimeRecord structure (uses projectId and Date objects)
  */
 export function getProjectDuration(
-	projectName: string,
+	projectId: number,
 	records: TimeRecord[],
 	startTime?: number,
 	endTime?: number,
 ): number {
 	return records
-		.filter((r) => r.projectName === projectName && r.endTime !== null)
+		.filter((r) => r.projectId === projectId && r.endTime !== null)
 		.filter((r) => {
 			const recordEnd = r.endTime!.getTime();
 			const recordStart = r.startTime.getTime();
@@ -62,21 +60,6 @@ export function getProjectDuration(
 			const end = endTime ? Math.min(recordEnd, endTime) : recordEnd;
 			return total + (end - start);
 		}, 0);
-}
-
-/**
- * Get total duration for a project by ID within a time range
- */
-export function getProjectDurationById(
-	projectId: number,
-	records: TimeRecord[],
-	projectsMap: Map<number, string>,
-	startTime?: number,
-	endTime?: number,
-): number {
-	const projectName = projectsMap.get(projectId);
-	if (!projectName) return 0;
-	return getProjectDuration(projectName, records, startTime, endTime);
 }
 
 /**

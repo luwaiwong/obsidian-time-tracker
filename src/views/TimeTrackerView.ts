@@ -1,16 +1,14 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import ProjectGrid from "../components/ProjectGrid.svelte";
-import TimeTrackerSummary from "../components/TimeSummary.svelte";
 import Overview from "../components/Overview.svelte";
-import { ProjectModal } from "../modals/ProjectModal";
+import Schedule from "../components/Schedule.svelte";
 import { mount, unmount } from "svelte";
 
 export const VIEW_TYPE_TIME_TRACKER = "time-tracker-view";
 
 export class TimeTrackerView extends ItemView {
 	plugin: TimeTrackerPlugin;
-	private gridComponent: Record<string, any> | null = null;
+	private scheduleComponent: Record<string, any> | null = null;
 	private summaryComponent: Record<string, any> | null = null;
 	private headerComponent: Record<string, any> | null = null;
 
@@ -76,14 +74,11 @@ export class TimeTrackerView extends ItemView {
 		// Content area
 		const content = container.createDiv("time-tracker-content");
 
-		// show project grid
-		this.gridComponent = mount(ProjectGrid, {
+		// show project schedule view
+		this.scheduleComponent = mount(Schedule, {
 			target: content,
 			props: {
 				plugin: this.plugin,
-				projects: this.plugin.timesheetData?.projects || [],
-				runningTimers: this.plugin.runningTimers || [],
-				gridColumns: this.plugin.settings?.gridColumns || 3,
 			},
 		});
 	}
@@ -93,9 +88,9 @@ export class TimeTrackerView extends ItemView {
 			unmount(this.headerComponent);
 			this.headerComponent = null;
 		}
-		if (this.gridComponent) {
-			unmount(this.gridComponent);
-			this.gridComponent = null;
+		if (this.scheduleComponent) {
+			unmount(this.scheduleComponent);
+			this.scheduleComponent = null;
 		}
 		if (this.summaryComponent) {
 			unmount(this.summaryComponent);

@@ -4,8 +4,9 @@ import type { Project, TimeRecord } from "../types";
 import { ProjectModal } from "./ProjectModal";
 import { CSVHandler } from "../utils/csvHandler";
 import { formatDuration, formatDateTime } from "../utils/timeUtils";
-import ProjectSelectorGrid from "../components/ProjectSelectorGrid.svelte";
+import ProjectGrid from "../components/ProjectGrid.svelte";
 import { mount, unmount } from "svelte";
+import { title } from "process";
 
 export class ProjectSelectorModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -24,10 +25,12 @@ export class ProjectSelectorModal extends Modal {
 		onComplete: () => void,
 		isSwitching: boolean = false,
 		initialTitle: string = "",
+		selectedProject: Project | null = null,
 	) {
 		super(app);
 		this.plugin = plugin;
 		this.onComplete = onComplete;
+		this.selectedProject = selectedProject;
 		this.isSwitching = isSwitching;
 		this.titleInput = initialTitle;
 		this.lastRecord = plugin.getLastStoppedRecord();
@@ -37,7 +40,10 @@ export class ProjectSelectorModal extends Modal {
 		const { contentEl } = this;
 		contentEl.addClass("project-selector-modal");
 
-		const title = this.isSwitching ? "Switch Project" : "Start Tracking";
+		const title = this.plugin.settings.retroactiveTrackingEnabled
+			? "Track Retroactively"
+			: "Start Record";
+
 		contentEl.createEl("h2", { text: title });
 
 		// Show retroactive info if enabled
@@ -68,8 +74,8 @@ export class ProjectSelectorModal extends Modal {
 
 		// Repeat last button (if there's a last record)
 		if (this.lastRecord) {
-			const lastProject = this.plugin.getProjectByName(
-				this.lastRecord.projectName,
+			const lastProject = this.plugin.getProjectById(
+				this.lastRecord.projectId,
 			);
 			if (lastProject) {
 				const repeatSetting = new Setting(contentEl);
@@ -107,38 +113,21 @@ export class ProjectSelectorModal extends Modal {
 		// Project grid container
 		const gridContainer = contentEl.createDiv("project-grid-container");
 
-		this.gridComponent = mount(ProjectSelectorGrid, {
+		this.gridComponent = mount(ProjectGrid, {
 			target: gridContainer,
 			props: {
 				plugin: this.plugin,
 				selectedProjectId: this.selectedProject?.id || null,
-				onSelect: (project: Project) => {
+				selectionMode: true,
+				onProjectClick: (project: Project) => {
 					this.selectedProject = project;
 					// Auto-fill title from last record of same project if empty
 					if (!this.titleInput) {
 						this.autoFillTitle(project);
 					}
 					// Re-mount to show selection
-					if (this.gridComponent) {
-						unmount(this.gridComponent);
-					}
-					this.gridComponent = mount(ProjectSelectorGrid, {
-						target: gridContainer,
-						props: {
-							plugin: this.plugin,
-							selectedProjectId: project.id,
-							onSelect: (p: Project) => {
-								this.selectedProject = p;
-								if (!this.titleInput) {
-									this.autoFillTitle(p);
-								}
-								this.updateGrid(gridContainer);
-							},
-							gridColumns: 3,
-						},
-					});
+					this.updateGrid(gridContainer);
 				},
-				gridColumns: 3,
 			},
 		});
 
@@ -191,26 +180,26 @@ export class ProjectSelectorModal extends Modal {
 			unmount(this.gridComponent);
 		}
 		container.empty();
-		this.gridComponent = mount(ProjectSelectorGrid, {
+		this.gridComponent = mount(ProjectGrid, {
 			target: container,
 			props: {
 				plugin: this.plugin,
 				selectedProjectId: this.selectedProject?.id || null,
-				onSelect: (project: Project) => {
+				selectionMode: true,
+				onProjectClick: (project: Project) => {
 					this.selectedProject = project;
 					if (!this.titleInput) {
 						this.autoFillTitle(project);
 					}
 					this.updateGrid(container);
 				},
-				gridColumns: 3,
 			},
 		});
 	}
 
 	private autoFillTitle(project: Project): void {
 		const projectRecords = this.plugin.timesheetData.records
-			.filter((r) => r.projectName === project.name && r.endTime !== null)
+			.filter((r) => r.projectId === project.id && r.endTime !== null)
 			.sort((a, b) => b.endTime!.getTime() - a.endTime!.getTime());
 
 		if (projectRecords.length > 0 && projectRecords[0].title) {
@@ -230,86 +219,17 @@ export class ProjectSelectorModal extends Modal {
 		contentEl.empty();
 	}
 
-	async save(): Promise<void> {
-		if (!this.selectedProject) {
+	async save(projectId: number = -1): Promise<void> {
+		if (!this.selectedProject && projectId === -1) {
 			new Notice("Please select a project");
 			return;
 		}
 
-		const now = new Date();
-
-		// If switching projects, stop current timer first
-		if (this.isSwitching) {
-			const currentTimer = this.plugin.runningTimers[0];
-			if (currentTimer) {
-				this.plugin.stopTimer(currentTimer.projectId);
-			}
+		if (this.selectedProject) {
+			projectId = this.selectedProject.id;
 		}
 
-		if (this.plugin.settings.retroactiveTrackingEnabled) {
-			// Retroactive mode: create completed record
-			const lastRecord = this.lastRecord;
-
-			if (lastRecord?.endTime) {
-				// Check if same project and same title - extend last record
-				if (
-					lastRecord.projectName === this.selectedProject.name &&
-					lastRecord.title === this.titleInput.trim()
-				) {
-					const index = this.plugin.timesheetData.records.findIndex(
-						(r) => r.id === lastRecord.id,
-					);
-					if (index !== -1) {
-						this.plugin.timesheetData.records[index].endTime = now;
-					}
-				} else {
-					// Create new completed record filling the gap
-					const newRecord: TimeRecord = {
-						id: CSVHandler.getNextId(
-							this.plugin.timesheetData.records,
-						),
-						projectName: this.selectedProject.name,
-						startTime: lastRecord.endTime,
-						endTime: now,
-						title: this.titleInput.trim(),
-					};
-					this.plugin.timesheetData.records.push(newRecord);
-				}
-			} else {
-				// No previous record - create minimal entry
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.plugin.timesheetData.records),
-					projectName: this.selectedProject.name,
-					startTime: now,
-					endTime: now,
-					title: this.titleInput.trim(),
-				};
-				this.plugin.timesheetData.records.push(newRecord);
-			}
-
-			await this.plugin.saveTimesheet();
-			this.plugin.refreshViews();
-		} else {
-			// Normal mode: start a running timer
-			this.plugin.startTimer(this.selectedProject.id, false);
-
-			// Set the title if provided
-			if (this.titleInput.trim()) {
-				setTimeout(() => {
-					const runningRecord =
-						this.plugin.timesheetData.records.find(
-							(r) =>
-								r.projectName === this.selectedProject!.name &&
-								r.endTime === null,
-						);
-					if (runningRecord) {
-						runningRecord.title = this.titleInput.trim();
-						this.plugin.saveTimesheet();
-						this.plugin.refreshViews();
-					}
-				}, 50);
-			}
-		}
+		this.plugin.startTimer(projectId, title);
 
 		this.onComplete();
 		this.close();

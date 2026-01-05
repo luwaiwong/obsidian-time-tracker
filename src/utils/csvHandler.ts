@@ -71,9 +71,13 @@ export class CSVHandler {
 		// endTime can be empty for running timers
 		const endTime = endTimeStr ? this.parseDateTime(endTimeStr) : null;
 
+		// Look up project by name to get its ID (-1 if not found or empty)
+		const project = data.projects.find((p) => p.name === projectName);
+		const projectId = project?.id ?? -1;
+
 		data.records.push({
 			id,
-			projectName,
+			projectId,
 			startTime,
 			endTime,
 			title,
@@ -241,11 +245,17 @@ export class CSVHandler {
 				? this.formatDateTime(record.endTime)
 				: "";
 
+			// Look up project name from projectId
+			const project = data.projects.find(
+				(p) => p.id === record.projectId,
+			);
+			const projectName = project?.name ?? "";
+
 			lines.push(
 				[
 					"record",
 					record.id,
-					this.escapeCSVField(record.projectName),
+					this.escapeCSVField(projectName),
 					startTimeStr,
 					endTimeStr,
 					this.escapeCSVField(record.title),

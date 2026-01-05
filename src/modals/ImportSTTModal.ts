@@ -320,18 +320,24 @@ export class ImportModal extends Modal {
 				const projectName = projectNameMap.get(record.typeId);
 				if (!projectName) continue;
 
+				// Look up project by name to get its ID
+				const project = this.plugin.timesheetData.projects.find(
+					(p) => p.name === projectName,
+				);
+				if (!project) continue;
+
 				// Check for duplicate records (same project, same start time)
 				const startTime = new Date(record.startTime);
 				const isDuplicate = existingRecords.some(
 					(r) =>
-						r.projectName === projectName &&
+						r.projectId === project.id &&
 						r.startTime.getTime() === startTime.getTime(),
 				);
 
 				if (!isDuplicate) {
 					const newRecord: TimeRecord = {
 						id: nextRecordId,
-						projectName: projectName,
+						projectId: project.id,
 						startTime: startTime,
 						endTime: new Date(record.endTime),
 						title: record.comment || "",

@@ -2,27 +2,19 @@
 	import type TimeTrackerPlugin from "../../main";
 	import type { Project } from "../types";
 	import { formatDuration } from "../utils/timeUtils";
+	import { Calendar } from "@fullcalendar/core";
+	import timeGridPlugin from "@fullcalendar/timegrid";
+	import interactionPlugin from "@fullcalendar/interaction";
+	import { onMount, onDestroy } from "svelte";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
 	}
 
-	type ScheduleBlock = {
-		key: string;
-		project: Project;
-		start: number;
-		end: number;
-		duration: number;
-		top: number;
-		height: number;
-		isRunning: boolean;
-	};
-
-	const HOURS = Array.from({ length: 25 }, (_, i) => i);
-	const DAY_MS = 24 * 60 * 60 * 1000;
-	const MIN_BLOCK_HEIGHT_PERCENT = 1;
-
 	let { plugin }: Props = $props();
+
+	let calendarEl: HTMLDivElement;
+	let calendar: Calendar | null = null;
 	let selectedDate = $state(new Date());
 	let now = $state(Date.now());
 	let interval: number | undefined;
@@ -33,6 +25,7 @@
 		if (interval) clearInterval(interval);
 		interval = window.setInterval(() => {
 			now = Date.now();
+			updateCalendarEvents();
 		}, 1000 * 30);
 
 		return () => {
@@ -44,10 +37,16 @@
 		const next = new Date(selectedDate);
 		next.setDate(next.getDate() + delta);
 		selectedDate = next;
+		if (calendar) {
+			calendar.gotoDate(next);
+		}
 	}
 
 	function setToday() {
 		selectedDate = new Date();
+		if (calendar) {
+			calendar.gotoDate(selectedDate);
+		}
 	}
 
 	function getDayRange(date: Date) {
@@ -58,48 +57,9 @@
 		return { start: start.getTime(), end: end.getTime() };
 	}
 
-	function formatTimeOfDay(timestamp: number) {
-		return new Date(timestamp).toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	}
-
-	function buildBlock(
-		key: string,
-		project: Project,
-		start: number,
-		end: number,
-		isRunning: boolean,
-		dayStart: number,
-		dayLength: number,
-	): ScheduleBlock {
-		const duration = Math.max(end - start, 0);
-		const top = ((start - dayStart) / dayLength) * 100;
-		const height = Math.max(
-			(duration / dayLength) * 100,
-			MIN_BLOCK_HEIGHT_PERCENT,
-		);
-
-		return {
-			key,
-			project,
-			start,
-			end,
-			duration,
-			top,
-			height,
-			isRunning,
-		};
-	}
-
-	let dayRange = $derived(getDayRange(selectedDate));
-	let dayLength = $derived(dayRange.end - dayRange.start);
-
-	let blocks: ScheduleBlock[] = $derived.by(() => {
-		const { start, end } = dayRange;
-		const items: ScheduleBlock[] = [];
-		if (dayLength <= 0 || projects.length === 0) return items;
+	function buildCalendarEvents() {
+		const events: any[] = [];
+		const { start, end } = getDayRange(selectedDate);
 
 		// Process completed records
 		for (const record of records) {
@@ -108,23 +68,25 @@
 			const recordEnd = record.endTime.getTime();
 			if (recordEnd < start || recordStart > end) continue;
 
-			const project = plugin.getProjectByName(record.projectName);
+			const project = plugin.getProjectById(record.projectId);
 			if (!project) continue;
 
 			const clampedStart = Math.max(recordStart, start);
 			const clampedEnd = Math.min(recordEnd, end);
 
-			items.push(
-				buildBlock(
-					`record-${record.id}`,
+			events.push({
+				id: `record-${record.id}`,
+				title: `${project.icon} ${project.name}`,
+				start: new Date(clampedStart),
+				end: new Date(clampedEnd),
+				backgroundColor: project.color,
+				borderColor: project.color,
+				extendedProps: {
 					project,
-					clampedStart,
-					clampedEnd,
-					false,
-					start,
-					dayLength,
-				),
-			);
+					duration: clampedEnd - clampedStart,
+					isRunning: false,
+				},
+			});
 		}
 
 		// Process running timers
@@ -138,46 +100,40 @@
 			const clampedStart = Math.max(timerStart, start);
 			const clampedEnd = Math.min(now, end);
 
-			items.push(
-				buildBlock(
-					`running-${timer.projectId}`,
+			events.push({
+				id: `running-${timer.projectId}`,
+				title: `${project.icon} ${project.name} (Running)`,
+				start: new Date(clampedStart),
+				end: new Date(clampedEnd),
+				backgroundColor: project.color,
+				borderColor: project.color,
+				extendedProps: {
 					project,
-					clampedStart,
-					clampedEnd,
-					true,
-					start,
-					dayLength,
-				),
-			);
+					duration: clampedEnd - clampedStart,
+					isRunning: true,
+				},
+			});
 		}
 
-		return items
-			.filter((block) => block.height > 0)
-			.sort((a, b) => a.start - b.start);
+		return events;
+	}
+
+	function updateCalendarEvents() {
+		if (!calendar) return;
+		const events = buildCalendarEvents();
+		calendar.removeAllEvents();
+		calendar.addEventSource(events);
+	}
+
+	let totalDayDuration = $derived.by(() => {
+		const events = buildCalendarEvents();
+		return events.reduce(
+			(total, event) => total + (event.extendedProps?.duration || 0),
+			0,
+		);
 	});
 
-	let totalDayDuration = $derived(
-		blocks.reduce((total, block) => total + block.duration, 0),
-	);
-
-	function getNowMarkerPosition() {
-		if (!isSameDay(selectedDate, now)) return null;
-		const { start } = dayRange;
-		const position = ((now - start) / DAY_MS) * 100;
-		if (position < 0 || position > 100) return null;
-		return position;
-	}
-
-	function isSameDay(date: Date, timestamp: number) {
-		const check = new Date(timestamp);
-		return (
-			date.getFullYear() === check.getFullYear() &&
-			date.getMonth() === check.getMonth() &&
-			date.getDate() === check.getDate()
-		);
-	}
-
-	let nowPosition = $derived(getNowMarkerPosition());
+	let blockCount = $derived(buildCalendarEvents().length);
 
 	let selectedDateLabel = $derived(
 		selectedDate.toLocaleDateString(undefined, {
@@ -186,311 +142,179 @@
 			day: "numeric",
 		}),
 	);
+
+	let resizeObserver: ResizeObserver | null = null;
+
+	onMount(() => {
+		calendar = new Calendar(calendarEl, {
+			plugins: [timeGridPlugin, interactionPlugin],
+			initialView: "timeGridDay",
+			initialDate: selectedDate,
+			headerToolbar: false,
+			height: "100%",
+			slotMinTime: "00:00:00",
+			slotMaxTime: "24:00:00",
+			slotDuration: "01:00:00",
+			slotLabelInterval: "01:00:00",
+			allDaySlot: false,
+			nowIndicator: true,
+			slotLabelFormat: {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			},
+			eventTimeFormat: {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			},
+			events: buildCalendarEvents(),
+			eventContent: (arg) => {
+				const duration = arg.event.extendedProps?.duration || 0;
+				const isRunning = arg.event.extendedProps?.isRunning || false;
+
+				return {
+					html: `
+						<div class="flex flex-col gap-0.5">
+							<div class="font-bold text-sm">${arg.event.title}</div>
+							<div class="text-xs opacity-95">
+								${arg.timeText}
+							</div>
+							<div class="text-xs opacity-90 font-semibold">
+								${isRunning ? "Running • " : ""}${formatDuration(duration, true)}
+							</div>
+						</div>
+					`,
+				};
+			},
+		});
+
+		calendar.render();
+
+		// Watch for container resize to update calendar dimensions
+		resizeObserver = new ResizeObserver(() => {
+			if (calendar) {
+				calendar.updateSize();
+			}
+		});
+		resizeObserver.observe(calendarEl);
+	});
+
+	onDestroy(() => {
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+		}
+		if (calendar) {
+			calendar.destroy();
+		}
+		if (interval) {
+			clearInterval(interval);
+		}
+	});
+
+	// Update events when data changes
+	$effect(() => {
+		// Watch for changes in projects, records, or selectedDate
+		projects;
+		records;
+		selectedDate;
+		updateCalendarEvents();
+	});
 </script>
 
-<div class="schedule">
-	<div class="schedule-header">
-		<div class="date-controls">
-			<button class="ghost" onclick={() => moveDay(-1)}>‹</button>
-			<button class="solid" onclick={setToday}>Today</button>
-			<button class="ghost" onclick={() => moveDay(1)}>›</button>
-			<div class="date-label">{selectedDateLabel}</div>
-		</div>
-		<div class="day-summary">
-			<span>Total {formatDuration(totalDayDuration, true)}</span>
-			<span class="divider">•</span>
-			<span
-				>{blocks.length}
-				{blocks.length === 1 ? "block" : "blocks"}</span
+<div class="flex flex-col gap-3 h-full p-3 box-border overflow-hidden">
+	<div
+		class="flex items-center justify-between gap-3 shrink-0 max-sm:flex-col max-sm:items-start"
+	>
+		<div class="flex items-center gap-2">
+			<button
+				class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+				onclick={() => moveDay(-1)}
 			>
+				‹
+			</button>
+			<button
+				class="border border-[var(--interactive-accent)] rounded-md px-2.5 py-1.5 bg-[var(--interactive-accent)] text-[var(--text-on-accent)] cursor-pointer font-semibold hover:brightness-105"
+				onclick={setToday}
+			>
+				Today
+			</button>
+			<button
+				class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+				onclick={() => moveDay(1)}
+			>
+				›
+			</button>
+			<div class="font-bold text-base text-[var(--text-normal)] ml-2">
+				{selectedDateLabel}
+			</div>
 		</div>
+		<!-- <div
+			class="flex items-center gap-1.5 text-[var(--text-muted)] font-semibold"
+		>
+			<span>Total {formatDuration(totalDayDuration, true)}</span>
+			<span class="opacity-60">•</span>
+			<span>{blockCount} {blockCount === 1 ? "block" : "blocks"}</span>
+		</div> -->
 	</div>
 
-	<div class="schedule-body">
-		<div class="time-axis">
-			{#each HOURS as hour (hour)}
-				<div class="axis-row">
-					<span class="axis-label"
-						>{String(hour).padStart(2, "0")}:00</span
-					>
-				</div>
-			{/each}
-		</div>
-
-		<div class="schedule-canvas">
-			{#each HOURS as hour (hour)}
-				<div
-					class="hour-line"
-					style={`top: ${(hour / 24) * 100}%;`}
-				></div>
-			{/each}
-
-			{#if nowPosition !== null}
-				<div class="now-line" style={`top: ${nowPosition}%;`}>
-					<span>Now</span>
-				</div>
-			{/if}
-
-			{#each blocks as block (block.key)}
-				<div
-					class="time-block"
-					style={`top: ${block.top}%; height: ${block.height}%; background-color: ${block.project.color};`}
-				>
-					<div class="block-content">
-						<div class="block-title">
-							<span class="block-icon">{block.project.icon}</span>
-							<span class="block-name">{block.project.name}</span>
-						</div>
-						<div class="block-times">
-							{formatTimeOfDay(block.start)} - {formatTimeOfDay(
-								block.end,
-							)}
-						</div>
-						<div class="block-duration">
-							{block.isRunning
-								? "Running • "
-								: ""}{formatDuration(block.duration, true)}
-						</div>
-					</div>
-				</div>
-			{/each}
-
-			{#if blocks.length === 0}
-				<div class="empty-state">
-					<p>No entries for this day.</p>
-				</div>
-			{/if}
-		</div>
-	</div>
+	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>
 </div>
 
 <style>
-	.schedule {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
+	/* FullCalendar customization */
+	:global(.fc) {
 		height: 100%;
-		padding: 12px;
-		box-sizing: border-box;
+		font-family: var(--font-interface);
 	}
 
-	.schedule-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-	}
-
-	.date-controls {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.date-label {
-		font-weight: 700;
-		font-size: 1em;
-		color: var(--text-normal);
-		margin-left: 8px;
-	}
-
-	.day-summary {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		color: var(--text-muted);
-		font-weight: 600;
-	}
-
-	.day-summary .divider {
-		opacity: 0.6;
-	}
-
-	.schedule-body {
-		display: flex;
-		gap: 12px;
-		align-items: stretch;
-	}
-
-	.time-axis {
-		width: 70px;
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	.axis-row {
+	:global(.fc .fc-timegrid-slot) {
 		height: 48px;
-		display: flex;
-		align-items: flex-start;
-		justify-content: flex-end;
-		padding-right: 8px;
-		box-sizing: border-box;
+	}
+
+	:global(.fc .fc-timegrid-slot-label) {
 		color: var(--text-muted);
 		font-size: 0.85em;
 	}
 
-	.schedule-canvas {
-		position: relative;
-		flex: 1;
-		min-height: 1152px;
+	:global(.fc .fc-timegrid-divider) {
+		display: none;
+	}
+
+	:global(.fc .fc-scrollgrid) {
+		border-color: var(--background-modifier-border);
+	}
+
+	:global(.fc .fc-scrollgrid td) {
+		border-color: var(--background-modifier-border);
+	}
+
+	:global(.fc .fc-timegrid-axis) {
+		background: var(--background-primary);
+	}
+
+	:global(.fc .fc-timegrid-slot-lane) {
 		background: var(--background-secondary);
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 10px;
-		overflow: hidden;
 	}
 
-	.hour-line {
-		position: absolute;
-		left: 0;
-		right: 0;
-		height: 1px;
-		background: var(--background-modifier-border);
-		pointer-events: none;
-	}
-
-	.now-line {
-		position: absolute;
-		left: 0;
-		right: 0;
-		height: 2px;
-		background: var(--text-accent);
-		display: flex;
-		align-items: center;
-		color: var(--text-accent);
-		font-size: 0.75em;
-		font-weight: 700;
-		pointer-events: none;
-	}
-
-	.now-line span {
-		background: var(--background-secondary);
-		padding: 2px 6px;
-		border-radius: 4px;
-		margin-left: 6px;
-	}
-
-	.time-block {
-		position: absolute;
-		left: 10px;
-		right: 10px;
-		border-radius: 8px;
-		color: white;
-		padding: 10px;
-		box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
-		box-sizing: border-box;
-		overflow: hidden;
-		display: flex;
-		align-items: center;
-	}
-
-	.time-block::after {
-		content: "";
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(
-			135deg,
-			rgba(0, 0, 0, 0.1),
-			rgba(255, 255, 255, 0.1)
-		);
-		pointer-events: none;
-	}
-
-	.block-content {
-		position: relative;
-		z-index: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		width: 100%;
-	}
-
-	.block-title {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-weight: 700;
-	}
-
-	.block-icon {
-		font-size: 1.2em;
-	}
-
-	.block-name {
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.block-times {
-		font-size: 0.9em;
-		opacity: 0.95;
-	}
-
-	.block-duration {
-		font-size: 0.85em;
-		opacity: 0.9;
-		font-weight: 600;
-	}
-
-	button {
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 6px;
-		padding: 6px 10px;
-		background: var(--background-secondary);
+	:global(.fc .fc-col-header-cell) {
+		background: var(--background-primary);
 		color: var(--text-normal);
-		cursor: pointer;
 		font-weight: 600;
 	}
 
-	button.solid {
-		background: var(--interactive-accent);
-		color: var(--text-on-accent);
-		border-color: var(--interactive-accent);
+	:global(.fc .fc-event) {
+		border-radius: 6px;
+		padding: 4px 8px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	}
 
-	button.ghost {
-		background: transparent;
+	:global(.fc .fc-timegrid-now-indicator-line) {
+		border-color: var(--text-accent);
+		border-width: 2px;
 	}
 
-	button:hover {
-		filter: brightness(1.05);
-	}
-
-	@media (max-width: 700px) {
-		.schedule-body {
-			flex-direction: column;
-		}
-
-		.time-axis {
-			flex-direction: row;
-			overflow-x: auto;
-			width: 100%;
-		}
-
-		.axis-row {
-			height: auto;
-			padding: 4px;
-		}
-
-		.schedule-canvas {
-			min-height: 900px;
-		}
-
-		.empty-state {
-			left: 12px;
-			right: 12px;
-		}
-	}
-
-	.empty-state {
-		position: absolute;
-		top: 40%;
-		left: 0;
-		right: 0;
-		text-align: center;
-		color: var(--text-muted);
-		font-style: italic;
-		pointer-events: none;
+	:global(.fc .fc-timegrid-now-indicator-arrow) {
+		border-color: var(--text-accent);
 	}
 </style>

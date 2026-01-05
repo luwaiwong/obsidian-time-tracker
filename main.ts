@@ -10,12 +10,11 @@ import { CSVHandler } from "./src/utils/csvHandler";
 import type {
 	PluginSettings,
 	TimesheetData,
-	RunningTimer,
 	TimeRecord,
 	Project,
 } from "./src/types";
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
-import { ImportModal } from "./src/modals/ImportModal";
+import { ImportModal } from "./src/modals/ImportSTTModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -48,6 +47,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	error: string | null = null;
 	isLoading: boolean = true;
 
+	// ----- OBSIDIAN FUNCTIONS -----
 	async onload() {
 		await this.loadSettings();
 		this.csvHandler = new CSVHandler(this.app.vault);
@@ -90,7 +90,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			callback: () => this.toggleLastTimer(),
 		});
 		this.addCommand({
-			id: "import-data",
+			id: "import-STT-data",
 			name: "Import Data from Simple Time Tracker",
 			callback: () => new ImportModal(this.app, this).open(),
 		});
@@ -119,6 +119,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		await this.saveTimesheet();
 	}
 
+	// ----- LOADING DATA -----
 	async loadSettings() {
 		this.settings = Object.assign(
 			{},
@@ -174,24 +175,270 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	/** Get running timers derived from records with null endTime */
-	get runningTimers(): RunningTimer[] {
+	get runningTimers(): TimeRecord[] {
 		if (!this.timesheetData || !this.timesheetData.records) {
 			return [];
 		}
-		return this.timesheetData.records
-			.filter((record) => record.endTime === null)
-			.map((record) => {
-				const project = this.getProjectByName(record.projectName);
-				return {
-					projectId: project?.id ?? -1,
-					projectName: record.projectName,
-					startTime: record.startTime,
-					recordId: record.id,
-				};
-			});
+		return this.timesheetData.records.filter(
+			(record) => record.endTime === null,
+		);
 	}
 
+	// ----- RECORDS -----
+
+	/*
+	 * Start tracking time without a project
+	 * Can only be used when retroactive mode is off
+	 * @param title - The title of the task being tracked
+	 */
+	startTimerWithoutProject(title: string = "") {
+		if (this.settings.retroactiveTrackingEnabled) {
+			throw new Error(
+				"Cannot start timer without project in retroactive mode",
+			);
+		}
+
+		const now = new Date();
+
+		this.stopAllTimers();
+
+		// Create a new record with null endTime (running timer) and empty projectName
+		const newRecord: TimeRecord = {
+			id: CSVHandler.getNextId(this.timesheetData.records),
+			projectId: -1,
+			startTime: now,
+			endTime: null,
+			title: title,
+		};
+		this.timesheetData.records.push(newRecord);
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	/** Start tracking time for a project */
+	startTimer(
+		projectId: number = -1,
+		title: string = "",
+		startTime: Date = new Date(),
+	) {
+		const project = this.getProjectById(projectId);
+		if (!project) return;
+
+		const now = new Date();
+
+		// for retroactive
+		if (this.settings.retroactiveTrackingEnabled) {
+			const lastRecord = this.getLastStoppedRecord();
+			if (lastRecord && lastRecord.endTime) {
+				const gap = now.getTime() - lastRecord.endTime.getTime();
+				if (gap > 0) {
+					if (lastRecord.projectId === project.id) {
+						// Extend the last record
+						const index = this.timesheetData.records.findIndex(
+							(r) => r.id === lastRecord.id,
+						);
+						if (index !== -1) {
+							this.timesheetData.records[index].endTime = now;
+						}
+					} else {
+						// Create a new completed record for the gap
+						const newRecord: TimeRecord = {
+							id: CSVHandler.getNextId(
+								this.timesheetData.records,
+							),
+							projectId: project.id,
+							startTime: lastRecord.endTime,
+							endTime: now,
+							title: title,
+						};
+						this.timesheetData.records.push(newRecord);
+					}
+				}
+			}
+		} else {
+			this.stopAllTimers();
+
+			// Check if this project is already running
+			const existingTimer = this.runningTimers.find(
+				(t) => t.projectId === projectId,
+			);
+
+			if (existingTimer) {
+				this.stopTimer(projectId);
+			} else {
+				// Create a new record with null endTime (running timer)
+				const newRecord: TimeRecord = {
+					id: CSVHandler.getNextId(this.timesheetData.records),
+					projectId: project.id,
+					startTime: now,
+					endTime: null,
+					title: "",
+				};
+				this.timesheetData.records.push(newRecord);
+			}
+		}
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	/** Stop a specific timer */
+	stopTimer(projectId: number) {
+		let recordIndex: number;
+
+		if (projectId === -1) {
+			// Stop timer without project (empty projectName)
+			recordIndex = this.timesheetData.records.findIndex(
+				(r) => r.projectId === -1 && r.endTime === null,
+			);
+		} else {
+			const project = this.getProjectById(projectId);
+			if (!project) return;
+
+			recordIndex = this.timesheetData.records.findIndex(
+				(r) => r.projectId === project.id && r.endTime === null,
+			);
+		}
+
+		if (recordIndex === -1) return;
+
+		this.timesheetData.records[recordIndex].endTime = new Date();
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	/*
+	 * edit a specific record
+	 * returns true if the record was successfully edited
+	 */
+	editRecord(id: number, changes: TimeRecord): boolean {
+		const recordIndex = this.timesheetData.records.findIndex(
+			(r) => r.id === id,
+		);
+		if (recordIndex === -1) return false;
+
+		this.timesheetData.records[recordIndex] = {
+			...this.timesheetData.records[recordIndex],
+			...changes,
+		};
+
+		this.saveTimesheet();
+		this.refreshViews();
+		return true;
+	}
+
+	/** Stop all running timers */
+	stopAllTimers() {
+		const now = new Date();
+		for (const record of this.timesheetData.records) {
+			if (record.endTime === null) {
+				record.endTime = now;
+			}
+		}
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	/** Get the last stopped record (completed, with endTime) */
+	getLastStoppedRecord(): TimeRecord | null {
+		const completedRecords = this.timesheetData.records.filter(
+			(r) => r.endTime !== null,
+		);
+		if (completedRecords.length === 0) return null;
+
+		return completedRecords.reduce((latest, record) => {
+			if (!latest.endTime) return record;
+			if (!record.endTime) return latest;
+			return record.endTime.getTime() > latest.endTime.getTime()
+				? record
+				: latest;
+		});
+	}
+
+	/** Toggle the last used timer */
+	toggleLastTimer() {
+		const lastRecord = this.getLastStoppedRecord();
+		if (!lastRecord) return;
+
+		const project = this.getProjectById(lastRecord.projectId);
+		if (!project) return;
+
+		const isRunning = this.runningTimers.some(
+			(t) => t.projectId === project.id,
+		);
+		if (isRunning) {
+			this.stopTimer(project.id);
+		} else {
+			this.startTimer(project.id);
+		}
+	}
+
+	/** Check if a project is currently running */
+	isProjectRunning(projectId: number): boolean {
+		return this.runningTimers.some((t) => t.projectId === projectId);
+	}
+
+	/** Update a record's title */
+	updateRecordTitle(recordId: number, title: string): void {
+		const index = this.timesheetData.records.findIndex(
+			(r) => r.id === recordId,
+		);
+		if (index !== -1) {
+			this.timesheetData.records[index].title = title;
+			this.saveTimesheet();
+		}
+	}
+
+	/** Get the current running record (first one if multiple) */
+	getCurrentRunningRecord(): TimeRecord | null {
+		const timer = this.runningTimers[0];
+		if (!timer) return null;
+		return (
+			this.timesheetData.records.find((r) => r.id === timer.id) || null
+		);
+	}
+
+	/** Create a retroactive record entry */
+	createRetroactiveRecord(projectId: number, title: string): void {
+		const project = this.getProjectById(projectId);
+		if (!project) return;
+
+		const now = new Date();
+		const lastRecord = this.getLastStoppedRecord();
+
+		if (lastRecord?.endTime) {
+			// Check if should extend
+			if (
+				lastRecord.projectId === projectId &&
+				lastRecord.title === title
+			) {
+				const index = this.timesheetData.records.findIndex(
+					(r) => r.id === lastRecord.id,
+				);
+				if (index !== -1) {
+					this.timesheetData.records[index].endTime = now;
+				}
+			} else {
+				// Create new completed record
+				const newRecord: TimeRecord = {
+					id: CSVHandler.getNextId(this.timesheetData.records),
+					projectId: projectId,
+					startTime: lastRecord.endTime,
+					endTime: now,
+					title: title,
+				};
+				this.timesheetData.records.push(newRecord);
+			}
+		}
+
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	// ----- PROJECT -----
 	getProjectByName(name: string): Project | undefined {
 		if (!this.timesheetData || !this.timesheetData.projects) {
 			return undefined;
@@ -206,6 +453,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		return this.timesheetData.projects.find((p) => p.id === id);
 	}
 
+	// ----- VIEWS -----
 	async activateView() {
 		const { workspace } = this.app;
 
@@ -274,228 +522,6 @@ export default class TimeTrackerPlugin extends Plugin {
 		if (leaf) {
 			workspace.revealLeaf(leaf);
 		}
-	}
-
-	/** Start tracking time without a project */
-	startTimerWithoutProject(title: string = "") {
-		const now = new Date();
-
-		this.stopAllTimers();
-
-		// Create a new record with null endTime (running timer) and empty projectName
-		const newRecord: TimeRecord = {
-			id: CSVHandler.getNextId(this.timesheetData.records),
-			projectName: "",
-			startTime: now,
-			endTime: null,
-			title: title,
-		};
-		this.timesheetData.records.push(newRecord);
-
-		this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** Start tracking time for a project */
-	startTimer(projectId: number, retroactive: boolean = false) {
-		const project = this.getProjectById(projectId);
-		if (!project) return;
-
-		const now = new Date();
-
-		if (retroactive && this.settings.retroactiveTrackingEnabled) {
-			const lastRecord = this.getLastStoppedRecord();
-			if (lastRecord && lastRecord.endTime) {
-				const gap = now.getTime() - lastRecord.endTime.getTime();
-				if (gap > 0) {
-					if (lastRecord.projectName === project.name) {
-						// Extend the last record
-						const index = this.timesheetData.records.findIndex(
-							(r) => r.id === lastRecord.id,
-						);
-						if (index !== -1) {
-							this.timesheetData.records[index].endTime = now;
-						}
-					} else {
-						// Create a new completed record for the gap
-						const newRecord: TimeRecord = {
-							id: CSVHandler.getNextId(
-								this.timesheetData.records,
-							),
-							projectName: project.name,
-							startTime: lastRecord.endTime,
-							endTime: now,
-							title: "",
-						};
-						this.timesheetData.records.push(newRecord);
-					}
-				}
-			}
-		} else {
-			this.stopAllTimers();
-
-			// Check if this project is already running
-			const existingTimer = this.runningTimers.find(
-				(t) => t.projectId === projectId,
-			);
-			if (existingTimer) {
-				this.stopTimer(projectId);
-			} else {
-				// Create a new record with null endTime (running timer)
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectName: project.name,
-					startTime: now,
-					endTime: null,
-					title: "",
-				};
-				this.timesheetData.records.push(newRecord);
-			}
-		}
-
-		this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** Stop a specific timer */
-	stopTimer(projectId: number) {
-		let recordIndex: number;
-
-		if (projectId === -1) {
-			// Stop timer without project (empty projectName)
-			recordIndex = this.timesheetData.records.findIndex(
-				(r) => r.projectName === "" && r.endTime === null,
-			);
-		} else {
-			const project = this.getProjectById(projectId);
-			if (!project) return;
-
-			recordIndex = this.timesheetData.records.findIndex(
-				(r) => r.projectName === project.name && r.endTime === null,
-			);
-		}
-
-		if (recordIndex === -1) return;
-
-		this.timesheetData.records[recordIndex].endTime = new Date();
-
-		this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** Stop all running timers */
-	stopAllTimers() {
-		const now = new Date();
-		for (const record of this.timesheetData.records) {
-			if (record.endTime === null) {
-				record.endTime = now;
-			}
-		}
-
-		this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** Get the last stopped record (completed, with endTime) */
-	getLastStoppedRecord(): TimeRecord | null {
-		const completedRecords = this.timesheetData.records.filter(
-			(r) => r.endTime !== null,
-		);
-		if (completedRecords.length === 0) return null;
-
-		return completedRecords.reduce((latest, record) => {
-			if (!latest.endTime) return record;
-			if (!record.endTime) return latest;
-			return record.endTime.getTime() > latest.endTime.getTime()
-				? record
-				: latest;
-		});
-	}
-
-	/** Toggle the last used timer */
-	toggleLastTimer() {
-		const lastRecord = this.getLastStoppedRecord();
-		if (!lastRecord) return;
-
-		const project = this.getProjectByName(lastRecord.projectName);
-		if (!project) return;
-
-		const isRunning = this.runningTimers.some(
-			(t) => t.projectId === project.id,
-		);
-		if (isRunning) {
-			this.stopTimer(project.id);
-		} else {
-			this.startTimer(project.id);
-		}
-	}
-
-	/** Check if a project is currently running */
-	isProjectRunning(projectId: number): boolean {
-		return this.runningTimers.some((t) => t.projectId === projectId);
-	}
-
-	/** Get running timer for a project */
-	getRunningTimer(projectId: number): RunningTimer | undefined {
-		return this.runningTimers.find((t) => t.projectId === projectId);
-	}
-
-	/** Update a record's title */
-	updateRecordTitle(recordId: number, title: string): void {
-		const index = this.timesheetData.records.findIndex(
-			(r) => r.id === recordId,
-		);
-		if (index !== -1) {
-			this.timesheetData.records[index].title = title;
-			this.saveTimesheet();
-		}
-	}
-
-	/** Get the current running record (first one if multiple) */
-	getCurrentRunningRecord(): TimeRecord | null {
-		const timer = this.runningTimers[0];
-		if (!timer) return null;
-		return (
-			this.timesheetData.records.find((r) => r.id === timer.recordId) ||
-			null
-		);
-	}
-
-	/** Create a retroactive record entry */
-	createRetroactiveRecord(projectId: number, title: string): void {
-		const project = this.getProjectById(projectId);
-		if (!project) return;
-
-		const now = new Date();
-		const lastRecord = this.getLastStoppedRecord();
-
-		if (lastRecord?.endTime) {
-			// Check if should extend
-			if (
-				lastRecord.projectName === project.name &&
-				lastRecord.title === title
-			) {
-				const index = this.timesheetData.records.findIndex(
-					(r) => r.id === lastRecord.id,
-				);
-				if (index !== -1) {
-					this.timesheetData.records[index].endTime = now;
-				}
-			} else {
-				// Create new completed record
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectName: project.name,
-					startTime: lastRecord.endTime,
-					endTime: now,
-					title: title,
-				};
-				this.timesheetData.records.push(newRecord);
-			}
-		}
-
-		this.saveTimesheet();
-		this.refreshViews();
 	}
 
 	/** Refresh all open views */

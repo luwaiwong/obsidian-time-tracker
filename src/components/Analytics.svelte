@@ -88,7 +88,7 @@
 			.map((project) => ({
 				label: project.name,
 				value: getProjectDuration(
-					project.name,
+					project.id,
 					plugin.timesheetData.records,
 					start,
 					end,
@@ -177,7 +177,7 @@
 			const recordStart = record.startTime.getTime();
 			if (recordEnd < start || recordStart > end) return;
 
-			const project = plugin.getProjectByName(record.projectName);
+			const project = plugin.getProjectById(record.projectId);
 			if (!project || !projects.some((p) => p.id === project.id)) return;
 
 			const recordDate = new Date(recordStart);
