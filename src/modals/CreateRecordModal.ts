@@ -1,7 +1,7 @@
 import { App, Modal, Notice, setIcon } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
-import { ProjectModal } from "./ProjectModal";
+import { CreateProjectModal } from "./CreateProjectModal";
 import ProjectSelector from "../components/ProjectSelector.svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";

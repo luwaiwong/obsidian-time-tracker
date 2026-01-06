@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { TimeRecord } from "../types";
-	import { formatDuration, formatNaturalDuration } from "../utils/timeUtils";
+	import {
+		formatDuration,
+		formatNaturalDuration,
+		getRecordDuration,
+	} from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { CreateRecordModal } from "../modals/CreateRecordModal";
 	import { EditRecordModal } from "../modals/EditRecordModal";
@@ -198,16 +202,9 @@
 			plugin.refreshViews();
 		}
 	}
-
-	function getRecordDuration(record: TimeRecord): string {
-		if (!record.endTime) return "0:00";
-		return formatDuration(
-			record.endTime.getTime() - record.startTime.getTime(),
-		);
-	}
 </script>
 
-<div class="border-b border-(--background-modifier-border) px-3 pt-3 pb-4">
+<div class="border-b border-(--background-modifier-border) px-3 pt-3">
 	<!-- CONTROL AREA -->
 	<div
 		class="grid gap-2"
@@ -287,58 +284,62 @@
 					{@const project = plugin.getProjectById(record.projectId)}
 					<div class="flex items-center gap-2 rounded">
 						<!-- project name and title -->
-						<div class="flex-1 min-w-0 flex items-center gap-">
+						<div
+							class="flex-1 min-w-0 flex items-center gap-1"
+							aria-label={(project
+								? `${project.name}`
+								: `No project`) +
+								(record.title
+									? ` - ${record.title}`
+									: " - untitled")}
+						>
 							{#if project}
-								<span
-									class="text-sm font-medium shrink-0 size-7 rounded flex items-center justify-center"
+								<div
+									class="rounded flex items-center justify-center pr-2"
 									style="background-color: {project.color};"
-									>{project.icon}</span
 								>
-
-								<span class="text-sm font-medium shrink-0 pl-2"
-									>{project.name}</span
-								>
-								{#if record.title}
-									<span class="text-sm text-(--text-muted)"
-										>·</span
-									>
 									<span
-										class="text-sm text-(--text-muted) truncate"
+										class="text-xs font-medium shrink-0 size-7 flex items-center justify-center"
+										>{project.icon}</span
+									>
+
+									<span class="text-xs font-medium shrink-0"
+										>{project.name}</span
+									>
+								</div>
+								{#if record.title}
+									<span
+										class="text-xs text-(--text-muted) truncate"
 										>{record.title}</span
 									>
 								{/if}
 							{:else}
 								<span
-									class="text-sm text-(--text-faint) italic shrink-0"
+									class="text-xs text-(--text-faint) italic shrink-0"
 									>No project</span
 								>
 								{#if record.title}
-									<span class="text-sm text-(--text-muted)"
-										>·</span
-									>
 									<span
-										class="text-sm text-(--text-normal) truncate"
+										class="text-xs text-(--text-normal) truncate"
 										>{record.title}</span
 									>
 								{/if}
 							{/if}
 						</div>
 
-						<div
-							class="text-s text-(--text-muted) tabular-nums pr-2"
-						>
-							{getRecordDuration(record)}
+						<div class="text-xs text-(--text-muted) tabular-nums">
+							{formatNaturalDuration(getRecordDuration(record))}
 						</div>
 						<!-- buttons -->
 						<button
-							class="size-12 rounded p-0"
+							class="size-10 rounded p-0"
 							aria-label="Repeat"
 							onclick={() => handleRepeat(record)}
 							{@attach icon("repeat")}
 						>
 						</button>
 						<button
-							class="size-12 rounded p-0"
+							class="size-10 rounded p-0"
 							aria-label="Edit"
 							onclick={() => handleEdit(record)}
 							{@attach icon("pencil")}

@@ -19,6 +19,10 @@ export class EditRecordModal extends Modal {
 	private timeComponent: Record<string, unknown> | null = null;
 	private titleComponent: Record<string, unknown> | null = null;
 
+	private gridContainer: HTMLElement;
+	private timeContainer: HTMLElement;
+	private titleContainer: HTMLElement;
+
 	constructor(
 		app: App,
 		plugin: TimeTrackerPlugin,
@@ -51,9 +55,9 @@ export class EditRecordModal extends Modal {
 		titleDivider.style.cssText =
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
-		const titleContainer = contentEl.createDiv("title-input-container");
+		this.titleContainer = contentEl.createDiv("title-input-container");
 		this.titleComponent = mount(TextInput, {
-			target: titleContainer,
+			target: this.titleContainer,
 			props: {
 				value: this.titleInput,
 				placeholder: "Title",
@@ -73,8 +77,8 @@ export class EditRecordModal extends Modal {
 		projectDivider.style.cssText =
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
-		const gridContainer = contentEl.createDiv("project-grid-container");
-		this.gridComponent = this.mountGridComponent(gridContainer);
+		this.gridContainer = contentEl.createDiv("project-grid-container");
+		this.gridComponent = this.mountGridComponent(this.gridContainer);
 
 		// time selector
 		const timeLabel = contentEl.createEl("p", { text: "Time" });
@@ -85,8 +89,8 @@ export class EditRecordModal extends Modal {
 		timeDivider.style.cssText =
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
-		const timeContainer = contentEl.createDiv("time-grid-container");
-		this.timeComponent = this.mountTimeComponent(timeContainer);
+		this.timeContainer = contentEl.createDiv("time-grid-container");
+		this.timeComponent = this.mountTimeComponent(this.timeContainer);
 
 		// bottom buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
@@ -136,13 +140,12 @@ export class EditRecordModal extends Modal {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 		}
-
 		if (this.timeComponent) {
 			unmount(this.timeComponent);
 		}
 		container.empty();
-		this.gridComponent = this.mountGridComponent(this.contentEl);
-		this.timeComponent = this.mountTimeComponent(this.contentEl);
+		this.gridComponent = this.mountGridComponent(this.gridContainer);
+		this.timeComponent = this.mountTimeComponent(this.timeContainer);
 	}
 
 	onClose() {
