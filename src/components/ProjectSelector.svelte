@@ -3,7 +3,7 @@
 	import type { Project, TimeRecord } from "../types";
 	import type TimeTrackerPlugin from "../../main";
 	import { slide } from "svelte/transition";
-	import { compareColors } from "src/utils/colorUtils";
+	import { compareColors } from "..//utils/colorUtils";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -18,7 +18,7 @@
 	}
 	let {
 		plugin,
-		gridColumns = this.plugin.settings.gridColumns,
+		gridColumns = plugin.settings.gridColumns,
 		onProjectClick,
 		selectedProjectId = null,
 		selectionMode = false,
@@ -26,11 +26,16 @@
 		dropdownOpen: initialDropdownOpen = false,
 	}: Props = $props();
 
-	let dropdownOpen = $state(this.initialDropdownOpen);
+	let dropdownOpen = $state(initialDropdownOpen);
 	let currentTime = $state(Date.now());
 	let interval: number | undefined;
-	let projects = this.plugin.timesheetData.projects;
-	let runningTimers = this.plugin.runningTimers;
+	let projects = $derived(plugin.timesheetData.projects);
+	let runningTimers = $derived(plugin.runningTimers);
+
+	// set gridColumns from plugin settings after mount
+	$effect(() => {
+		gridColumns = plugin.settings.gridColumns;
+	});
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
