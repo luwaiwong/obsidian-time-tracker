@@ -5,7 +5,6 @@ import {
 	VIEW_TYPE_TIME_TRACKER,
 } from "./src/views/TimeTrackerView";
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
-import { ScheduleView, VIEW_TYPE_SCHEDULE } from "./src/views/ScheduleView";
 import { CSVHandler } from "./src/utils/csvHandler";
 import type {
 	PluginSettings,
@@ -15,6 +14,7 @@ import type {
 } from "./src/types";
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
 import { ImportModal } from "./src/modals/ImportSTTModal";
+import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -31,7 +31,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	inactivityReminderDuration: 3600,
 	activityReminderDuration: 1800,
 	embeddedRecentRecordsCount: 5,
-	sortMode: "manual",
+	sortMode: "name",
 	categoryFilter: [],
 };
 
@@ -60,11 +60,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			VIEW_TYPE_ANALYTICS,
 			(leaf) => new AnalyticsView(leaf, this),
 		);
-		this.registerView(
-			VIEW_TYPE_SCHEDULE,
-			(leaf) => new ScheduleView(leaf, this),
-		);
-
 		this.addRibbonIcon("clock", "Time Tracker", () => {
 			this.activateView();
 		});
@@ -80,11 +75,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			callback: () => this.activateAnalyticsView(),
 		});
 		this.addCommand({
-			id: "open-schedule",
-			name: "Open Schedule",
-			callback: () => this.activateScheduleView(),
-		});
-		this.addCommand({
 			id: "toggle-last-timer",
 			name: "Toggle Last Used Timer",
 			callback: () => this.toggleLastTimer(),
@@ -93,6 +83,11 @@ export default class TimeTrackerPlugin extends Plugin {
 			id: "import-STT-data",
 			name: "Import Data from Simple Time Tracker",
 			callback: () => new ImportModal(this.app, this).open(),
+		});
+		this.addCommand({
+			id: "resolve-conflicts",
+			name: "Resolve Conflicts",
+			callback: () => new ConflictResolverModal(this.app, this).open(),
 		});
 
 		this.registerMarkdownCodeBlockProcessor(
@@ -110,8 +105,16 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.activateView();
 		});
 
+		// reload timesheet when app comes back to foreground for mobile
+		this.registerDomEvent(document, "visibilitychange", () => {
+			if (document.visibilityState === "visible") {
+				this.loadTimesheet();
+			}
+		});
+
+		// reload timesheet every 30 seconds
 		this.registerInterval(
-			window.setInterval(() => this.saveTimesheet(), 5 * 60 * 1000),
+			window.setInterval(() => this.loadTimesheet(), 0.5 * 60 * 1000),
 		);
 	}
 
@@ -133,7 +136,15 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	async loadTimesheet() {
-		this.isLoading = true;
+		const hasExistingData =
+			this.timesheetData.records.length > 0 ||
+			this.timesheetData.projects.length > 0;
+
+		// only show loading if no data exists yet
+		if (!hasExistingData) {
+			this.isLoading = true;
+		}
+
 		console.log("Loading timesheet...");
 		try {
 			const file = this.app.vault.getAbstractFileByPath(
@@ -141,24 +152,60 @@ export default class TimeTrackerPlugin extends Plugin {
 			);
 			console.log("File found:", file);
 
+			let newData: TimesheetData;
 			if (file instanceof TFile) {
 				this.timesheetFile = file;
-				this.timesheetData = await this.csvHandler.parseTimesheet(file);
+				newData = await this.csvHandler.parseTimesheet(file);
 			} else {
 				this.timesheetFile = await this.csvHandler.createTimesheet(
 					this.settings.timesheetPath,
 				);
-				this.timesheetData = await this.csvHandler.parseTimesheet(
+				newData = await this.csvHandler.parseTimesheet(
 					this.timesheetFile,
 				);
 			}
+
+			// compare new data with current data, skip refresh if unchanged
+			if (this.isTimesheetDataEqual(this.timesheetData, newData)) {
+				console.log("Timesheet data unchanged, skipping refresh");
+				this.isLoading = false;
+				return;
+			}
+
+			this.timesheetData = newData;
+			this.isLoading = false;
+			this.refreshViews();
 		} catch (err) {
 			console.error("Error loading timesheet:", err);
 			this.error = "Error loading Timesheet: " + err;
-		} finally {
 			this.isLoading = false;
 			this.refreshViews();
 		}
+	}
+
+	private isTimesheetDataEqual(a: TimesheetData, b: TimesheetData): boolean {
+		if (
+			a.records.length !== b.records.length ||
+			a.projects.length !== b.projects.length ||
+			a.categories.length !== b.categories.length
+		) {
+			return false;
+		}
+
+		// compare records by stringifying (handles Date objects)
+		const aRecords = JSON.stringify(a.records);
+		const bRecords = JSON.stringify(b.records);
+		if (aRecords !== bRecords) return false;
+
+		const aProjects = JSON.stringify(a.projects);
+		const bProjects = JSON.stringify(b.projects);
+		if (aProjects !== bProjects) return false;
+
+		const aCategories = JSON.stringify(a.categories);
+		const bCategories = JSON.stringify(b.categories);
+		if (aCategories !== bCategories) return false;
+
+		return true;
 	}
 
 	async saveTimesheet() {
@@ -187,8 +234,8 @@ export default class TimeTrackerPlugin extends Plugin {
 	// ----- RECORDS -----
 
 	/*
-	 * Start tracking time without a project
-	 * Can only be used when retroactive mode is off
+	 * start tracking time without a project
+	 * can only be used when retroactive mode is off
 	 * @param title - The title of the task being tracked
 	 */
 	startTimerWithoutProject(title: string = "") {
@@ -216,7 +263,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.refreshViews();
 	}
 
-	/** Start tracking time for a project */
+	/** start tracking time for a project */
 	startTimer(
 		projectId: number = -1,
 		title: string = "",
@@ -230,12 +277,14 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		// for retroactive
 		if (this.settings.retroactiveTrackingEnabled) {
+			console.log("Retroactive tracking enabled");
 			const lastRecord = this.getLastStoppedRecord();
 			if (lastRecord && lastRecord.endTime) {
 				const gap = now.getTime() - lastRecord.endTime.getTime();
 				if (gap > 0) {
+					// extend record if the project is the same, create new otherwise
 					if (lastRecord.projectId === project.id) {
-						// Extend the last record
+						console.log("extend record");
 						const index = this.timesheetData.records.findIndex(
 							(r) => r.id === lastRecord.id,
 						);
@@ -243,7 +292,6 @@ export default class TimeTrackerPlugin extends Plugin {
 							this.timesheetData.records[index].endTime = now;
 						}
 					} else {
-						// Create a new completed record for the gap
 						const newRecord: TimeRecord = {
 							id: CSVHandler.getNextId(
 								this.timesheetData.records,
@@ -260,7 +308,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		} else {
 			this.stopAllTimers();
 
-			// Check if this project is already running
+			// check if this project is already running
 			const existingTimer = this.runningTimers.find(
 				(t) => t.projectId === projectId,
 			);
@@ -268,7 +316,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			if (existingTimer) {
 				this.stopTimer(projectId);
 			} else {
-				// Create a new record with null endTime (running timer)
+				// create a new record with null endTime (running timer)
 				const newRecord: TimeRecord = {
 					id: CSVHandler.getNextId(this.timesheetData.records),
 					projectId: project.id,
@@ -284,7 +332,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.refreshViews();
 	}
 
-	/** Find record by ID and extend its time */
+	/** find record by ID and extend its time */
 	repeatRecord(recordId: number, endTime: Date) {
 		const record = this.timesheetData.records.find(
 			(r) => r.id === recordId,
@@ -296,7 +344,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.refreshViews();
 	}
 
-	/** Stop a specific timer */
+	/** stop a specific timer */
 	stopTimer(projectId: number) {
 		let recordIndex: number;
 
@@ -342,7 +390,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		return true;
 	}
 
-	/** Stop all running timers */
+	/** stop all running timers */
 	stopAllTimers() {
 		const now = new Date();
 		for (const record of this.timesheetData.records) {
@@ -355,7 +403,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.refreshViews();
 	}
 
-	/** Get the last stopped record (completed, with endTime) */
+	/** set the last stopped record (completed, with endTime) */
 	getLastStoppedRecord(): TimeRecord | null {
 		const completedRecords = this.timesheetData.records.filter(
 			(r) => r.endTime !== null,
@@ -371,7 +419,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		});
 	}
 
-	/** Toggle the last used timer */
+	/** toggle the last used timer */
 	toggleLastTimer() {
 		const lastRecord = this.getLastStoppedRecord();
 		if (!lastRecord) return;
@@ -389,12 +437,12 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	/** Check if a project is currently running */
+	/** check if a project is currently running */
 	isProjectRunning(projectId: number): boolean {
 		return this.runningTimers.some((t) => t.projectId === projectId);
 	}
 
-	/** Update a record's title */
+	/** update a record's title */
 	updateRecordTitle(recordId: number, title: string): void {
 		const index = this.timesheetData.records.findIndex(
 			(r) => r.id === recordId,
@@ -405,50 +453,13 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	/** Get the current running record (first one if multiple) */
+	/** get the current running record (first one if multiple) */
 	getCurrentRunningRecord(): TimeRecord | null {
 		const timer = this.runningTimers[0];
 		if (!timer) return null;
 		return (
 			this.timesheetData.records.find((r) => r.id === timer.id) || null
 		);
-	}
-
-	/** Create a retroactive record entry */
-	createRetroactiveRecord(projectId: number, title: string): void {
-		const project = this.getProjectById(projectId);
-		if (!project) return;
-
-		const now = new Date();
-		const lastRecord = this.getLastStoppedRecord();
-
-		if (lastRecord?.endTime) {
-			// Check if should extend
-			if (
-				lastRecord.projectId === projectId &&
-				lastRecord.title === title
-			) {
-				const index = this.timesheetData.records.findIndex(
-					(r) => r.id === lastRecord.id,
-				);
-				if (index !== -1) {
-					this.timesheetData.records[index].endTime = now;
-				}
-			} else {
-				// Create new completed record
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectId: projectId,
-					startTime: lastRecord.endTime,
-					endTime: now,
-					title: title,
-				};
-				this.timesheetData.records.push(newRecord);
-			}
-		}
-
-		this.saveTimesheet();
-		this.refreshViews();
 	}
 
 	// ----- PROJECT -----
@@ -514,29 +525,6 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	async activateScheduleView() {
-		const { workspace } = this.app;
-
-		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_SCHEDULE);
-
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			leaf = workspace.getLeaf(true);
-			if (leaf) {
-				await leaf.setViewState({
-					type: VIEW_TYPE_SCHEDULE,
-					active: true,
-				});
-			}
-		}
-
-		if (leaf) {
-			workspace.revealLeaf(leaf);
-		}
-	}
-
 	/** Refresh all open views */
 	refreshViews() {
 		this.app.workspace
@@ -551,14 +539,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			.getLeavesOfType(VIEW_TYPE_ANALYTICS)
 			.forEach((leaf) => {
 				if (leaf.view instanceof AnalyticsView) {
-					leaf.view.refresh();
-				}
-			});
-
-		this.app.workspace
-			.getLeavesOfType(VIEW_TYPE_SCHEDULE)
-			.forEach((leaf) => {
-				if (leaf.view instanceof ScheduleView) {
 					leaf.view.refresh();
 				}
 			});
