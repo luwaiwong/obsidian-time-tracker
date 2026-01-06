@@ -1,8 +1,10 @@
-import { App, Modal, Setting, Notice } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
 import ProjectSelector from "../components/ProjectSelector.svelte";
 import { mount, unmount } from "svelte";
+import TimeSelector from "../components/TimeSelector.svelte";
+import TextInput from "../components/TextInput.svelte";
 
 export class EditRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -11,9 +13,11 @@ export class EditRecordModal extends Modal {
 
 	private titleInput: string;
 	private selectedProject: Project | null = null;
-	private startTimeInput: string;
-	private endTimeInput: string;
+	private startTimeInput: Date;
+	private endTimeInput: Date | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
+	private timeComponent: Record<string, unknown> | null = null;
+	private titleComponent: Record<string, unknown> | null = null;
 
 	constructor(
 		app: App,
@@ -28,74 +32,63 @@ export class EditRecordModal extends Modal {
 
 		this.titleInput = record.title;
 		this.selectedProject = plugin.getProjectById(record.projectId) || null;
-		this.startTimeInput = this.toDateTimeLocal(record.startTime);
-		this.endTimeInput = record.endTime
-			? this.toDateTimeLocal(record.endTime)
-			: "";
-	}
-
-	private toDateTimeLocal(date: Date): string {
-		const pad = (n: number) => n.toString().padStart(2, "0");
-		return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+		this.startTimeInput = record.startTime;
+		this.endTimeInput = record.endTime ? record.endTime : null;
 	}
 
 	onOpen() {
-		const { contentEl } = this;
-		contentEl.addClass("project-selector-modal");
+		const { contentEl, modalEl } = this;
+		modalEl.addClass("edit-record-modal");
 
 		contentEl.createEl("h2", { text: "Edit Record Entry" });
 
-		new Setting(contentEl)
-			.setName("Title")
-			.setDesc("What were you working on?")
-			.addText((text) =>
-				text
-					.setPlaceholder("Entry title...")
-					.setValue(this.titleInput)
-					.onChange((value) => {
-						this.titleInput = value;
-					}),
-			);
+		// title
+		const titleLabel = contentEl.createEl("p", { text: "Title" });
+		titleLabel.style.cssText =
+			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
 
-		// Project selector dropdown
-		const gridContainer = contentEl.createDiv("project-grid-container");
+		const titleDivider = contentEl.createEl("hr");
+		titleDivider.style.cssText =
+			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
-		this.gridComponent = mount(ProjectSelector, {
-			target: gridContainer,
+		const titleContainer = contentEl.createDiv("title-input-container");
+		this.titleComponent = mount(TextInput, {
+			target: titleContainer,
 			props: {
-				plugin: this.plugin,
-				selectedProjectId: this.selectedProject?.id || null,
-				selectionMode: true,
-				dropdownMode: true,
-				onProjectClick: (project: Project) => {
-					this.selectedProject = project;
-					this.updateGrid(gridContainer);
+				value: this.titleInput,
+				placeholder: "Title",
+				style: "height: 40px; font-size: 1rem;",
+				onInput: (value: string) => {
+					this.titleInput = value;
 				},
 			},
 		});
 
-		const startSetting = new Setting(contentEl)
-			.setName("Start Time")
-			.setDesc("When did you start?");
-		const startInput = startSetting.controlEl.createEl("input", {
-			type: "datetime-local",
-			value: this.startTimeInput,
-		});
-		startInput.addEventListener("change", (e) => {
-			this.startTimeInput = (e.target as HTMLInputElement).value;
-		});
+		// project selector
+		const projectLabel = contentEl.createEl("p", { text: "Project" });
+		projectLabel.style.cssText =
+			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
 
-		const endSetting = new Setting(contentEl)
-			.setName("End Time")
-			.setDesc("When did you finish?");
-		const endInput = endSetting.controlEl.createEl("input", {
-			type: "datetime-local",
-			value: this.endTimeInput,
-		});
-		endInput.addEventListener("change", (e) => {
-			this.endTimeInput = (e.target as HTMLInputElement).value;
-		});
+		const projectDivider = contentEl.createEl("hr");
+		projectDivider.style.cssText =
+			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
+		const gridContainer = contentEl.createDiv("project-grid-container");
+		this.gridComponent = this.mountGridComponent(gridContainer);
+
+		// time selector
+		const timeLabel = contentEl.createEl("p", { text: "Time" });
+		timeLabel.style.cssText =
+			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+
+		const timeDivider = contentEl.createEl("hr");
+		timeDivider.style.cssText =
+			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
+
+		const timeContainer = contentEl.createDiv("time-grid-container");
+		this.timeComponent = this.mountTimeComponent(timeContainer);
+
+		// bottom buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
 		buttonContainer.style.display = "flex";
 		buttonContainer.style.justifyContent = "space-between";
@@ -143,8 +136,51 @@ export class EditRecordModal extends Modal {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 		}
+
+		if (this.timeComponent) {
+			unmount(this.timeComponent);
+		}
 		container.empty();
-		this.gridComponent = mount(ProjectSelector, {
+		this.gridComponent = this.mountGridComponent(this.contentEl);
+		this.timeComponent = this.mountTimeComponent(this.contentEl);
+	}
+
+	onClose() {
+		if (this.gridComponent) {
+			unmount(this.gridComponent);
+			this.gridComponent = null;
+		}
+		if (this.timeComponent) {
+			unmount(this.timeComponent);
+			this.timeComponent = null;
+		}
+		if (this.titleComponent) {
+			unmount(this.titleComponent);
+			this.titleComponent = null;
+		}
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+
+	mountTimeComponent(container: HTMLElement) {
+		return mount(TimeSelector, {
+			target: container,
+			props: {
+				startDate: this.startTimeInput,
+				endDate: this.endTimeInput,
+				showEnd: this.record.endTime !== null,
+				onStartChanged: (date) => {
+					this.startTimeInput = date;
+				},
+				onEndChanged: (date) => {
+					this.endTimeInput = date;
+				},
+			},
+		});
+	}
+
+	mountGridComponent(container: HTMLElement) {
+		return mount(ProjectSelector, {
 			target: container,
 			props: {
 				plugin: this.plugin,
@@ -158,16 +194,6 @@ export class EditRecordModal extends Modal {
 			},
 		});
 	}
-
-	onClose() {
-		if (this.gridComponent) {
-			unmount(this.gridComponent);
-			this.gridComponent = null;
-		}
-		const { contentEl } = this;
-		contentEl.empty();
-	}
-
 	async save() {
 		const index = this.plugin.timesheetData.records.findIndex(
 			(r) => r.id === this.record.id,
@@ -177,8 +203,8 @@ export class EditRecordModal extends Modal {
 			return;
 		}
 
-		const newStart = new Date(this.startTimeInput);
-		const newEnd = this.endTimeInput ? new Date(this.endTimeInput) : null;
+		const newStart = this.startTimeInput;
+		const newEnd = this.endTimeInput ?? null;
 
 		if (isNaN(newStart.getTime())) {
 			new Notice("Invalid start time");
@@ -195,14 +221,11 @@ export class EditRecordModal extends Modal {
 			return;
 		}
 
-		if (!this.selectedProject) {
-			new Notice("Please select a project");
-			return;
-		}
-
 		this.plugin.timesheetData.records[index].title = this.titleInput.trim();
-		this.plugin.timesheetData.records[index].projectId =
-			this.selectedProject.id;
+		if (this.selectedProject) {
+			this.plugin.timesheetData.records[index].projectId =
+				this.selectedProject.id;
+		}
 		this.plugin.timesheetData.records[index].startTime = newStart;
 		this.plugin.timesheetData.records[index].endTime = newEnd;
 

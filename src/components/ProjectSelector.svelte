@@ -13,6 +13,7 @@
 		selectedProjectId?: number | null;
 		selectionMode?: boolean;
 		dropdownMode?: boolean;
+		dropdownOpen?: boolean;
 	}
 	let {
 		plugin,
@@ -21,9 +22,10 @@
 		selectedProjectId = null,
 		selectionMode = false,
 		dropdownMode = false,
+		dropdownOpen: initialDropdownOpen = false,
 	}: Props = $props();
 
-	let dropdownOpen = $state(false);
+	let dropdownOpen = $state(initialDropdownOpen);
 
 	let currentTime = $state(Date.now());
 	let interval: number | undefined;

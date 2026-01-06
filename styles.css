@@ -153,12 +153,30 @@ If your plugin does not need CSS, delete this file.
 	word-break: break-word;
 }
 
-/* Project Selector Modal (merged) */
-.project-selector-modal {
-	max-width: 500px;
+/* Edit Record Modal */
+.modal.edit-record-modal,
+.modal.create-record-modal {
+	max-width: 100%;
+	position: relative;
 }
 
-.project-selector-modal .retroactive-info {
+.modal.edit-record-modal > .modal-close-button,
+.modal.create-record-modal > .modal-close-button {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	margin: 0;
+}
+
+.modal.edit-record-modal > .modal-content,
+.modal.create-record-modal > .modal-content {
+	padding: 20px;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.edit-record-modal .retroactive-info,
+.create-record-modal .retroactive-info {
 	margin-bottom: 12px;
 	padding: 8px 12px;
 	background-color: var(--background-secondary);
@@ -167,12 +185,9 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 }
 
-.project-selector-modal .project-grid-label {
+.edit-record-modal .project-grid-label,
+.create-record-modal .project-grid-label {
 	margin-top: 16px;
 	margin-bottom: 8px;
 	font-weight: 500;
-}
-
-.project-selector-modal .project-grid-container {
-	margin-bottom: 8px;
 }

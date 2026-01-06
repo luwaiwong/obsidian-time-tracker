@@ -340,7 +340,7 @@
 			return (
 				total +
 				getProjectDuration(
-					project.name,
+					project.id,
 					plugin.timesheetData.records,
 					start,
 					end,

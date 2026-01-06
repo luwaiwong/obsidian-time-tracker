@@ -1,12 +1,12 @@
-import { App, Modal, Setting, Notice, setIcon } from "obsidian";
+import { App, Modal, Notice, setIcon } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
 import { ProjectModal } from "./ProjectModal";
-import { CSVHandler } from "../utils/csvHandler";
-import { formatDuration, formatDateTime } from "../utils/timeUtils";
 import ProjectSelector from "../components/ProjectSelector.svelte";
+import TimeSelector from "../components/TimeSelector.svelte";
+import TextInput from "../components/TextInput.svelte";
 import { mount, unmount } from "svelte";
-import { title } from "process";
+import { formatDuration, formatDateTime } from "../utils/timeUtils";
 
 export class CreateRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -16,8 +16,11 @@ export class CreateRecordModal extends Modal {
 	private titleInput: string = "";
 	private selectedProject: Project | null = null;
 	private lastRecord: TimeRecord | null = null;
+	private startTime: Date;
+	private endTime: Date | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
-	private titleInputEl: HTMLInputElement | null = null;
+	private timeComponent: Record<string, unknown> | null = null;
+	private titleComponent: Record<string, unknown> | null = null;
 
 	constructor(
 		app: App,
@@ -34,43 +37,49 @@ export class CreateRecordModal extends Modal {
 		this.isSwitching = isSwitching;
 		this.titleInput = initialTitle;
 		this.lastRecord = plugin.getLastStoppedRecord();
-	}
 
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.addClass("project-selector-modal");
-
-		const title = this.plugin.settings.retroactiveTrackingEnabled
-			? "Track Retroactively"
-			: "Start Record";
-
-		contentEl.createEl("h2", { text: title });
-
-		// Show retroactive info if enabled
+		// Set default times
 		if (
 			this.plugin.settings.retroactiveTrackingEnabled &&
 			this.lastRecord?.endTime
 		) {
-			const now = new Date();
-			const gap = now.getTime() - this.lastRecord.endTime.getTime();
-			const infoEl = contentEl.createDiv("retroactive-info");
-			infoEl.setText(
-				`Will fill: ${formatDateTime(this.lastRecord.endTime)} to now (${formatDuration(gap)})`,
-			);
+			this.startTime = this.lastRecord.endTime;
+			this.endTime = new Date();
+		} else {
+			this.startTime = new Date();
+			this.endTime = null;
 		}
+	}
 
-		// Title input
-		const titleSetting = new Setting(contentEl)
-			.setName("Title")
-			.setDesc("What are you working on?")
-			.addText((text) => {
-				this.titleInputEl = text.inputEl;
-				text.setPlaceholder("Entry title...")
-					.setValue(this.titleInput)
-					.onChange((value) => {
-						this.titleInput = value;
-					});
-			});
+	onOpen() {
+		const { contentEl, modalEl } = this;
+		modalEl.addClass("create-record-modal");
+
+		const modalTitle = this.plugin.settings.retroactiveTrackingEnabled
+			? "Track Retroactively"
+			: "Start Record";
+
+		contentEl.createEl("h2", { text: modalTitle });
+
+		// Title section
+		const titleLabel = contentEl.createEl("p", { text: "Title" });
+		titleLabel.style.cssText =
+			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+		const titleDivider = contentEl.createEl("hr");
+		titleDivider.style.cssText =
+			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
+		const titleContainer = contentEl.createDiv("title-input-container");
+		this.titleComponent = mount(TextInput, {
+			target: titleContainer,
+			props: {
+				value: this.titleInput,
+				placeholder: "What are you working on?",
+				style: "height: 40px; font-size: 1rem;",
+				onInput: (value: string) => {
+					this.titleInput = value;
+				},
+			},
+		});
 
 		// Repeat last button (if there's a last record)
 		if (this.lastRecord) {
@@ -78,13 +87,15 @@ export class CreateRecordModal extends Modal {
 				this.lastRecord.projectId,
 			);
 			if (lastProject) {
-				const repeatSetting = new Setting(contentEl);
-				const repeatBtn = repeatSetting.controlEl.createEl("button", {
+				const repeatContainer = contentEl.createDiv();
+				repeatContainer.style.cssText = "margin: 8px 0;";
+				const repeatBtn = repeatContainer.createEl("button", {
 					cls: "mod-muted",
 				});
 				repeatBtn.style.display = "flex";
 				repeatBtn.style.alignItems = "center";
 				repeatBtn.style.gap = "8px";
+				repeatBtn.style.width = "100%";
 
 				const iconSpan = repeatBtn.createSpan();
 				setIcon(iconSpan, "repeat");
@@ -96,52 +107,47 @@ export class CreateRecordModal extends Modal {
 				repeatBtn.addEventListener("click", () => {
 					this.selectedProject = lastProject;
 					this.titleInput = this.lastRecord?.title || "";
-					if (this.titleInputEl) {
-						this.titleInputEl.value = this.titleInput;
-					}
 					this.save();
 				});
 			}
 		}
 
-		// Project grid label
-		contentEl.createEl("div", {
-			text: "Select Project",
-			cls: "setting-item-name project-grid-label",
-		});
-
-		// Project grid container
+		// Project section
+		const projectLabel = contentEl.createEl("p", { text: "Project" });
+		projectLabel.style.cssText =
+			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+		const projectDivider = contentEl.createEl("hr");
+		projectDivider.style.cssText =
+			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 		const gridContainer = contentEl.createDiv("project-grid-container");
 
-		this.gridComponent = mount(ProjectSelector, {
-			target: gridContainer,
-			props: {
-				plugin: this.plugin,
-				selectedProjectId: this.selectedProject?.id || null,
-				selectionMode: true,
-				onProjectClick: (project: Project) => {
-					this.selectedProject = project;
-					// Auto-fill title from last record of same project if empty
-					if (!this.titleInput) {
-						this.autoFillTitle(project);
-					}
-					// Re-mount to show selection
-					this.updateGrid(gridContainer);
-				},
-			},
-		});
+		this.gridComponent = this.mountGridComponent(gridContainer);
 
-		// Create project button
-		const createSetting = new Setting(contentEl);
-		createSetting.addButton((btn) =>
-			btn.setButtonText("New Project").onClick(() => {
-				new ProjectModal(this.plugin.app, this.plugin, null, () => {
-					this.plugin.refreshViews();
-					// Refresh the grid
-					this.updateGrid(gridContainer);
-				}).open();
-			}),
-		);
+		// Time section (only show for retroactive tracking)
+		if (this.plugin.settings.retroactiveTrackingEnabled) {
+			const timeLabel = contentEl.createEl("p", { text: "Time" });
+			timeLabel.style.cssText =
+				"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+			const timeDivider = contentEl.createEl("hr");
+			timeDivider.style.cssText =
+				"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
+			const timeContainer = contentEl.createDiv("time-grid-container");
+
+			this.timeComponent = mount(TimeSelector, {
+				target: timeContainer,
+				props: {
+					startDate: this.startTime,
+					endDate: this.endTime,
+					showEnd: true,
+					onStartChanged: (date: Date) => {
+						this.startTime = date;
+					},
+					onEndChanged: (date: Date) => {
+						this.endTime = date;
+					},
+				},
+			});
+		}
 
 		// Action buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
@@ -175,17 +181,15 @@ export class CreateRecordModal extends Modal {
 		});
 	}
 
-	private updateGrid(container: HTMLElement): void {
-		if (this.gridComponent) {
-			unmount(this.gridComponent);
-		}
-		container.empty();
-		this.gridComponent = mount(ProjectSelector, {
+	private mountGridComponent(container: HTMLElement) {
+		return mount(ProjectSelector, {
 			target: container,
 			props: {
 				plugin: this.plugin,
 				selectedProjectId: this.selectedProject?.id || null,
 				selectionMode: true,
+				dropdownMode: true,
+				dropdownOpen: true,
 				onProjectClick: (project: Project) => {
 					this.selectedProject = project;
 					if (!this.titleInput) {
@@ -197,6 +201,14 @@ export class CreateRecordModal extends Modal {
 		});
 	}
 
+	private updateGrid(container: HTMLElement): void {
+		if (this.gridComponent) {
+			unmount(this.gridComponent);
+		}
+		container.empty();
+		this.gridComponent = this.mountGridComponent(container);
+	}
+
 	private autoFillTitle(project: Project): void {
 		const projectRecords = this.plugin.timesheetData.records
 			.filter((r) => r.projectId === project.id && r.endTime !== null)
@@ -204,9 +216,6 @@ export class CreateRecordModal extends Modal {
 
 		if (projectRecords.length > 0 && projectRecords[0].title) {
 			this.titleInput = projectRecords[0].title;
-			if (this.titleInputEl) {
-				this.titleInputEl.value = this.titleInput;
-			}
 		}
 	}
 
@@ -214,6 +223,14 @@ export class CreateRecordModal extends Modal {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 			this.gridComponent = null;
+		}
+		if (this.timeComponent) {
+			unmount(this.timeComponent);
+			this.timeComponent = null;
+		}
+		if (this.titleComponent) {
+			unmount(this.titleComponent);
+			this.titleComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();
@@ -229,7 +246,33 @@ export class CreateRecordModal extends Modal {
 			projectId = this.selectedProject.id;
 		}
 
-		this.plugin.startTimer(projectId, title);
+		if (this.plugin.settings.retroactiveTrackingEnabled) {
+			// Create a completed record
+			if (!this.endTime) {
+				new Notice("Please set an end time");
+				return;
+			}
+
+			if (this.endTime.getTime() < this.startTime.getTime()) {
+				new Notice("End time must be after start time");
+				return;
+			}
+
+			const newRecord: TimeRecord = {
+				id: Date.now(),
+				projectId: projectId,
+				title: this.titleInput.trim(),
+				startTime: this.startTime,
+				endTime: this.endTime,
+			};
+
+			this.plugin.timesheetData.records.push(newRecord);
+			await this.plugin.saveTimesheet();
+			this.plugin.refreshViews();
+		} else {
+			// Start a new timer
+			this.plugin.startTimer(projectId, this.titleInput);
+		}
 
 		this.onComplete();
 		this.close();
