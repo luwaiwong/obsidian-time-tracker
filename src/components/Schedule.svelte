@@ -152,6 +152,14 @@
 
 	let resizeObserver: ResizeObserver | null = null;
 
+	function getCurrentScrollTime(): string {
+		const now = new Date();
+		const hours = now.getHours();
+		// scroll to 3 hours after current time, clamped to 23:00
+		const scrollHour = Math.min(23, hours + 3);
+		return `${String(scrollHour).padStart(2, "0")}:00:00`;
+	}
+
 	onMount(() => {
 		calendar = new Calendar(calendarEl, {
 			plugins: [timeGridPlugin, interactionPlugin],
@@ -165,6 +173,7 @@
 			slotLabelInterval: "01:00:00",
 			allDaySlot: false,
 			nowIndicator: true,
+			scrollTime: getCurrentScrollTime(),
 			slotLabelFormat: {
 				hour: "2-digit",
 				minute: "2-digit",
