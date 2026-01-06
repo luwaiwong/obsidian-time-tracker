@@ -279,13 +279,13 @@
 <div class="flex flex-col gap-3 h-full p-3 box-border overflow-hidden">
 	<div class="flex items-center gap-2 shrink-0 w-full">
 		<button
-			class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+			class="border border-(--background-modifier-border) rounded-md px-2.5 py-1.5 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
 			onclick={() => moveDay(-1)}
 		>
 			‹
 		</button>
 		<button
-			class="flex-1 border border-[var(--interactive-accent)] rounded-md px-2.5 py-1.5 bg-[var(--interactive-accent)] text-[var(--text-on-accent)] cursor-pointer font-semibold hover:brightness-105"
+			class="flex-1 border border-(--interactive-accent) rounded-md px-2.5 py-1.5 bg-(--interactive-accent) text-(--text-on-accent) cursor-pointer font-semibold hover:brightness-105"
 			onclick={setToday}
 		>
 			{selectedDateLabel}
@@ -303,7 +303,7 @@
 			{@attach icon("settings")}
 		></button>
 		<button
-			class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+			class="border border-(--background-modifier-border) rounded-md px-2.5 py-1.5 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
 			onclick={() => moveDay(1)}
 		>
 			›
@@ -361,14 +361,6 @@
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	}
 
-	:global(.fc .fc-timegrid-now-indicator-line) {
-		/*border-color: var(--text-accent);*/
-		/*border-width: 2px;*/
-	}
-
-	:global(.fc .fc-timegrid-now-indicator-arrow) {
-		/*border-color: var(--text-accent);*/
-	}
 	/* hide details only when FC marks it as short */
 	:global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
 		display: none;
