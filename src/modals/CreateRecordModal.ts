@@ -61,7 +61,7 @@ export class CreateRecordModal extends Modal {
 
 		contentEl.createEl("h2", { text: modalTitle });
 
-		// Title section
+		// title section
 		const titleLabel = contentEl.createEl("p", { text: "Title" });
 		titleLabel.style.cssText =
 			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
@@ -81,7 +81,7 @@ export class CreateRecordModal extends Modal {
 			},
 		});
 
-		// Repeat last button (if there's a last record)
+		// repeat last button (if there's a last record)
 		if (this.lastRecord) {
 			const lastProject = this.plugin.getProjectById(
 				this.lastRecord.projectId,
@@ -96,6 +96,8 @@ export class CreateRecordModal extends Modal {
 				repeatBtn.style.alignItems = "center";
 				repeatBtn.style.gap = "8px";
 				repeatBtn.style.width = "100%";
+				repeatBtn.style.hover =
+					"background-color: var(--background-modifier-hover);";
 
 				const iconSpan = repeatBtn.createSpan();
 				setIcon(iconSpan, "repeat");
@@ -112,7 +114,7 @@ export class CreateRecordModal extends Modal {
 			}
 		}
 
-		// Project section
+		// project section
 		const projectLabel = contentEl.createEl("p", { text: "Project" });
 		projectLabel.style.cssText =
 			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
@@ -123,7 +125,7 @@ export class CreateRecordModal extends Modal {
 
 		this.gridComponent = this.mountGridComponent(gridContainer);
 
-		// Time section (only show for retroactive tracking)
+		// time section (only show for retroactive tracking)
 		if (this.plugin.settings.retroactiveTrackingEnabled) {
 			const timeLabel = contentEl.createEl("p", { text: "Time" });
 			timeLabel.style.cssText =
@@ -149,7 +151,7 @@ export class CreateRecordModal extends Modal {
 			});
 		}
 
-		// Action buttons
+		// action buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
 		buttonContainer.style.display = "flex";
 		buttonContainer.style.justifyContent = "flex-end";
@@ -258,17 +260,7 @@ export class CreateRecordModal extends Modal {
 				return;
 			}
 
-			const newRecord: TimeRecord = {
-				id: Date.now(),
-				projectId: projectId,
-				title: this.titleInput.trim(),
-				startTime: this.startTime,
-				endTime: this.endTime,
-			};
-
-			this.plugin.timesheetData.records.push(newRecord);
-			await this.plugin.saveTimesheet();
-			this.plugin.refreshViews();
+			this.plugin.startTimer(projectId, this.titleInput.trim());
 		} else {
 			// Start a new timer
 			this.plugin.startTimer(projectId, this.titleInput);
