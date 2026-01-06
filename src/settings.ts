@@ -1,9 +1,13 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type TimeTrackerPlugin from "../main";
-import { ProjectModal } from "./modals/ProjectModal";
+import { CreateProjectModal } from "./modals/CreateProjectModal";
+import { CreateCategoryModal } from "./modals/CreateCategoryModal";
+import ProjectSettingsGrid from "./components/ProjectSettingsGrid.svelte";
+import { mount, unmount } from "svelte";
 
 export class TimeTrackerSettingTab extends PluginSettingTab {
 	plugin: TimeTrackerPlugin;
+	private projectGridComponent: Record<string, any> | null = null;
 
 	constructor(app: App, plugin: TimeTrackerPlugin) {
 		super(app, plugin);
@@ -18,6 +22,12 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		// Clean up previous Svelte component
+		if (this.projectGridComponent) {
+			unmount(this.projectGridComponent);
+			this.projectGridComponent = null;
+		}
 
 		containerEl.createEl("h2", { text: "Time Tracker Settings" });
 
@@ -98,14 +108,14 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setDesc("How to sort projects in the grid")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("manual", "Manual")
 					.addOption("category", "By Category")
+					.addOption("color", "By Color")
 					.addOption("name", "By Name")
 					.addOption("recent", "Recently Used")
 					.setValue(this.plugin.settings.sortMode)
 					.onChange(
 						async (
-							value: "manual" | "category" | "name" | "recent",
+							value: "category" | "color" | "name" | "recent",
 						) => {
 							this.plugin.settings.sortMode = value;
 							await this.refreshAndSavePlugin();
@@ -214,19 +224,39 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		// project management section
 		containerEl.createEl("h3", { text: "Project Management" });
 
-		const projectsDiv = containerEl.createDiv("time-tracker-projects");
-		this.displayProjects(projectsDiv);
+		// Mount the Svelte ProjectSettingsGrid component
+		const projectsGridDiv = containerEl.createDiv(
+			"time-tracker-projects-grid",
+		);
+		this.projectGridComponent = mount(ProjectSettingsGrid, {
+			target: projectsGridDiv,
+			props: {
+				plugin: this.plugin,
+				onUpdate: () => {
+					// Refresh the grid when projects are updated
+					this.display();
+				},
+			},
+		});
 
-		new Setting(containerEl)
+		// Add new project button
+		const addProjectDiv = containerEl.createDiv();
+		addProjectDiv.style.marginTop = "16px";
+		new Setting(addProjectDiv)
 			.setName("Add new project")
 			.addButton((button) =>
 				button
 					.setButtonText("Add Project")
 					.setCta()
 					.onClick(() => {
-						new ProjectModal(this.app, this.plugin, null, () => {
-							this.display();
-						}).open();
+						new CreateProjectModal(
+							this.app,
+							this.plugin,
+							null,
+							() => {
+								this.display();
+							},
+						).open();
 					}),
 			);
 
@@ -242,81 +272,19 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 				button
 					.setButtonText("Add Category")
 					.setCta()
-					.onClick(async () => {
-						await this.addNewCategory();
-						this.display();
+					.onClick(() => {
+						new CreateCategoryModal(this.app, this.plugin, () => {
+							this.display();
+						}).open();
 					}),
 			);
 	}
 
-	private displayProjects(containerEl: HTMLElement) {
-		const projects = this.plugin.timesheetData.projects;
-
-		if (projects.length === 0) {
-			containerEl.createEl("p", {
-				text: "No projects yet. Create one to start tracking time!",
-			});
-			return;
-		}
-
-		for (const project of projects) {
-			const projectDiv = containerEl.createDiv(
-				"time-tracker-project-item",
-			);
-
-			const categoryName = this.getCategoryName(project.categoryId);
-
-			new Setting(projectDiv)
-				.setName(`${project.icon} ${project.name}`)
-				.setDesc(
-					`Category: ${categoryName}${project.archived ? " (Archived)" : ""}`,
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("pencil")
-						.setTooltip("Edit project")
-						.onClick(() => {
-							new ProjectModal(
-								this.app,
-								this.plugin,
-								project,
-								() => {
-									this.display();
-								},
-							).open();
-						}),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon(project.archived ? "folder-open" : "archive")
-						.setTooltip(project.archived ? "Unarchive" : "Archive")
-						.onClick(async () => {
-							project.archived = !project.archived;
-							await this.plugin.saveTimesheet();
-							this.plugin.refreshViews();
-							this.display();
-						}),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("trash")
-						.setTooltip("Delete project")
-						.onClick(async () => {
-							if (
-								confirm(
-									`Delete project "${project.name}"? All time logs will be kept.`,
-								)
-							) {
-								this.plugin.timesheetData.projects =
-									this.plugin.timesheetData.projects.filter(
-										(p) => p.id !== project.id,
-									);
-								await this.plugin.saveTimesheet();
-								this.plugin.refreshViews();
-								this.display();
-							}
-						}),
-				);
+	hide(): void {
+		// Clean up Svelte component when settings tab is hidden
+		if (this.projectGridComponent) {
+			unmount(this.projectGridComponent);
+			this.projectGridComponent = null;
 		}
 	}
 
@@ -388,27 +356,6 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		}
 	}
 
-	private async addNewCategory() {
-		const name = prompt("Enter category name:");
-		if (!name || !name.trim()) return;
-
-		const newId =
-			Math.max(
-				...this.plugin.timesheetData.categories.map((c) => c.id),
-				0,
-			) + 1;
-		const newCategory = {
-			id: newId,
-			name: name.trim(),
-			color: this.getRandomColor(),
-			archived: false,
-			order: this.plugin.timesheetData.categories.length,
-		};
-
-		this.plugin.timesheetData.categories.push(newCategory);
-		await this.plugin.saveTimesheet();
-	}
-
 	private async deleteCategory(categoryId: number) {
 		this.plugin.timesheetData.categories =
 			this.plugin.timesheetData.categories.filter(
@@ -422,21 +369,5 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		}
 
 		await this.plugin.saveTimesheet();
-	}
-
-	private getRandomColor(): string {
-		const colors = [
-			"#FF6B6B",
-			"#4ECDC4",
-			"#45B7D1",
-			"#FFA07A",
-			"#98D8C8",
-			"#F7DC6F",
-			"#BB8FCE",
-			"#85C1E2",
-			"#F8B88B",
-			"#52B788",
-		];
-		return colors[Math.floor(Math.random() * colors.length)];
 	}
 }

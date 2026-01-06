@@ -3,7 +3,7 @@ import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
 import { CSVHandler } from "../utils/csvHandler";
 
-export class ProjectModal extends Modal {
+export class CreateProjectModal extends Modal {
 	plugin: TimeTrackerPlugin;
 	project: Project | null;
 	onSave: () => void;

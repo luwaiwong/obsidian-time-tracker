@@ -1,6 +1,4 @@
 /**
- * Core data types for the Integrated Time Tracker plugin
- *
  * CSV Format:
  *   record,<id>,<projectName>,<startTime>,<endTime>,<title>
  *   project,<id>,<name>,<icon>,<color>,<archived>
@@ -53,7 +51,7 @@ export interface PluginSettings {
 	inactivityReminderDuration: number;
 	activityReminderDuration: number;
 	embeddedRecentRecordsCount: number;
-	sortMode: "manual" | "category" | "name" | "recent";
+	sortMode: "category" | "name" | "color" | "recent";
 	categoryFilter: number[];
 }
 
