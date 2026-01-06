@@ -1,7 +1,7 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
-import ProjectGrid from "../components/ProjectGrid.svelte";
+import ProjectSelector from "../components/ProjectSelector.svelte";
 import { mount, unmount } from "svelte";
 
 export class EditRecordModal extends Modal {
@@ -60,7 +60,7 @@ export class EditRecordModal extends Modal {
 		// Project selector dropdown
 		const gridContainer = contentEl.createDiv("project-grid-container");
 
-		this.gridComponent = mount(ProjectGrid, {
+		this.gridComponent = mount(ProjectSelector, {
 			target: gridContainer,
 			props: {
 				plugin: this.plugin,
@@ -144,7 +144,7 @@ export class EditRecordModal extends Modal {
 			unmount(this.gridComponent);
 		}
 		container.empty();
-		this.gridComponent = mount(ProjectGrid, {
+		this.gridComponent = mount(ProjectSelector, {
 			target: container,
 			props: {
 				plugin: this.plugin,

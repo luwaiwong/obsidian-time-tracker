@@ -295,7 +295,7 @@
 									>{project.icon}</span
 								>
 
-								<span class="text-sm font-medium shrink-0"
+								<span class="text-sm font-medium shrink-0 pl-2"
 									>{project.name}</span
 								>
 								{#if record.title}
