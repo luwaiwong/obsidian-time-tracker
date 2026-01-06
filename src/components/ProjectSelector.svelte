@@ -3,6 +3,7 @@
 	import type { Project, TimeRecord } from "../types";
 	import type TimeTrackerPlugin from "../../main";
 	import { slide } from "svelte/transition";
+	import { compareColors } from "src/utils/colorUtils";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -17,7 +18,7 @@
 	}
 	let {
 		plugin,
-		gridColumns = plugin.settings.gridColumns,
+		gridColumns = this.plugin.settings.gridColumns,
 		onProjectClick,
 		selectedProjectId = null,
 		selectionMode = false,
@@ -25,12 +26,11 @@
 		dropdownOpen: initialDropdownOpen = false,
 	}: Props = $props();
 
-	let dropdownOpen = $state(initialDropdownOpen);
-
+	let dropdownOpen = $state(this.initialDropdownOpen);
 	let currentTime = $state(Date.now());
 	let interval: number | undefined;
-	let projects = plugin.timesheetData.projects;
-	let runningTimers = plugin.runningTimers;
+	let projects = this.plugin.timesheetData.projects;
+	let runningTimers = this.plugin.runningTimers;
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
@@ -61,11 +61,13 @@
 	}
 
 	function isProjectRunning(projectId: number): boolean {
-		return runningTimers.some((t) => t.projectId === projectId);
+		return runningTimers.some((t: TimeRecord) => t.projectId === projectId);
 	}
 
 	function getRunningDuration(projectId: number): number {
-		const timer = runningTimers.find((t) => t.projectId === projectId);
+		const timer = runningTimers.find(
+			(t: TimeRecord) => t.projectId === projectId,
+		);
 		if (!timer) return 0;
 		return currentTime - timer.startTime.getTime();
 	}
@@ -104,7 +106,13 @@
 				});
 			}
 
-			case "manual":
+			case "color": {
+				return sorted.sort((a, b) => {
+					const colorA = a.color || "#000000";
+					const colorB = b.color || "#000000";
+					return compareColors(colorA, colorB);
+				});
+			}
 			default:
 				return sorted.sort((a, b) => a.order - b.order);
 		}
@@ -112,7 +120,7 @@
 
 	function getVisibleProjects(): Project[] {
 		const filtered = projects.filter(
-			(p) => plugin.settings.showArchivedProjects || !p.archived,
+			(p: Project) => plugin.settings.showArchivedProjects || !p.archived,
 		);
 		return sortProjects(filtered);
 	}
@@ -123,7 +131,7 @@
 	);
 	let selectedProject = $derived(
 		selectedProjectId
-			? projects.find((p) => p.id === selectedProjectId)
+			? projects.find((p: Project) => p.id === selectedProjectId)
 			: null,
 	);
 </script>

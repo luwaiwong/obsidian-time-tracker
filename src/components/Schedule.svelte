@@ -127,9 +127,27 @@
 
 	function updateCalendarEvents() {
 		if (!calendar) return;
-		const events = buildCalendarEvents();
-		calendar.removeAllEvents();
-		calendar.addEventSource(events);
+		const newEvents = buildCalendarEvents();
+		const currentEvents = calendar.getEvents();
+
+		for (const newEvent of newEvents) {
+			const existing = currentEvents.find((e) => e.id === newEvent.id);
+			if (existing) {
+				// update end time for running timers
+				if (newEvent.extendedProps?.isRunning) {
+					existing.setEnd(newEvent.end);
+				}
+			} else {
+				calendar.addEvent(newEvent);
+			}
+		}
+
+		// remove events that no longer exist
+		for (const existing of currentEvents) {
+			if (!newEvents.find((e) => e.id === existing.id)) {
+				existing.remove();
+			}
+		}
 	}
 
 	let totalDayDuration = $derived.by(() => {
@@ -259,44 +277,37 @@
 </script>
 
 <div class="flex flex-col gap-3 h-full p-3 box-border overflow-hidden">
-	<div
-		class="flex items-center justify-between gap-3 shrink-0 max-sm:flex-col max-sm:items-start"
-	>
-		<div class="flex items-center gap-2">
-			<button
-				class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
-				onclick={() => moveDay(-1)}
-			>
-				‹
-			</button>
-			<button
-				class="border border-[var(--interactive-accent)] rounded-md px-2.5 py-1.5 bg-[var(--interactive-accent)] text-[var(--text-on-accent)] cursor-pointer font-semibold hover:brightness-105"
-				onclick={setToday}
-			>
-				{selectedDateLabel}
-			</button>
-			<button
-				class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
-				onclick={() => moveDay(1)}
-			>
-				›
-			</button>
-		</div>
-		<div class="flex items-center gap-1">
-			<button
-				class="p-2 rounded transition-colors shrink-0"
-				aria-label="Open Analytics"
-				onclick={onOpenAnalytics}
-				{@attach icon("bar-chart-2")}
-			></button>
-
-			<button
-				class="p-2 rounded transition-colors shrink-0"
-				aria-label="Open Settings"
-				onclick={onOpenSettings}
-				{@attach icon("settings")}
-			></button>
-		</div>
+	<div class="flex items-center gap-2 shrink-0 w-full">
+		<button
+			class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+			onclick={() => moveDay(-1)}
+		>
+			‹
+		</button>
+		<button
+			class="flex-1 border border-[var(--interactive-accent)] rounded-md px-2.5 py-1.5 bg-[var(--interactive-accent)] text-[var(--text-on-accent)] cursor-pointer font-semibold hover:brightness-105"
+			onclick={setToday}
+		>
+			{selectedDateLabel}
+		</button>
+		<button
+			class="p-2 rounded transition-colors shrink-0"
+			aria-label="Open Analytics"
+			onclick={onOpenAnalytics}
+			{@attach icon("bar-chart-2")}
+		></button>
+		<button
+			class="p-2 rounded transition-colors shrink-0"
+			aria-label="Open Settings"
+			onclick={onOpenSettings}
+			{@attach icon("settings")}
+		></button>
+		<button
+			class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
+			onclick={() => moveDay(1)}
+		>
+			›
+		</button>
 	</div>
 
 	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>

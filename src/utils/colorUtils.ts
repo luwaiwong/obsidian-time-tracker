@@ -69,8 +69,12 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
  */
 export function sortColorsByHue(colors: string[]): string[] {
 	return [...colors].sort((a, b) => {
-		const hslA = hexToHsl(a);
-		const hslB = hexToHsl(b);
-		return hslA.h - hslB.h;
+		return compareColors(a, b);
 	});
+}
+
+export function compareColors(a: string, b: string): number {
+	const hslA = hexToHsl(a);
+	const hslB = hexToHsl(b);
+	return hslA.h - hslB.h;
 }

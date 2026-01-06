@@ -96,8 +96,8 @@ export class CreateRecordModal extends Modal {
 				repeatBtn.style.alignItems = "center";
 				repeatBtn.style.gap = "8px";
 				repeatBtn.style.width = "100%";
-				repeatBtn.style.hover =
-					"background-color: var(--background-modifier-hover);";
+				repeatBtn.style.cursor = "pointer";
+				// repeatBtn.style.backgroundColor = "var(--background-modifier-hover)";
 
 				const iconSpan = repeatBtn.createSpan();
 				setIcon(iconSpan, "repeat");
