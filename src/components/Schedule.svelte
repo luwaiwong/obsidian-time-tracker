@@ -2,6 +2,7 @@
 	import type TimeTrackerPlugin from "../../main";
 	import type { Project } from "../types";
 	import { formatDuration } from "../utils/timeUtils";
+	import { icon } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
 	import timeGridPlugin from "@fullcalendar/timegrid";
 	import interactionPlugin from "@fullcalendar/interaction";
@@ -9,9 +10,11 @@
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
+		onOpenAnalytics: () => void;
+		onOpenSettings: () => void;
 	}
 
-	let { plugin }: Props = $props();
+	let { plugin, onOpenAnalytics, onOpenSettings }: Props = $props();
 
 	let calendarEl: HTMLDivElement;
 	let calendar: Calendar | null = null;
@@ -237,7 +240,7 @@
 				class="border border-[var(--interactive-accent)] rounded-md px-2.5 py-1.5 bg-[var(--interactive-accent)] text-[var(--text-on-accent)] cursor-pointer font-semibold hover:brightness-105"
 				onclick={setToday}
 			>
-				Today
+				{selectedDateLabel}
 			</button>
 			<button
 				class="border border-[var(--background-modifier-border)] rounded-md px-2.5 py-1.5 bg-transparent text-[var(--text-normal)] cursor-pointer font-semibold hover:brightness-105"
@@ -245,17 +248,22 @@
 			>
 				›
 			</button>
-			<div class="font-bold text-base text-[var(--text-normal)] ml-2">
-				{selectedDateLabel}
-			</div>
 		</div>
-		<!-- <div
-			class="flex items-center gap-1.5 text-[var(--text-muted)] font-semibold"
-		>
-			<span>Total {formatDuration(totalDayDuration, true)}</span>
-			<span class="opacity-60">•</span>
-			<span>{blockCount} {blockCount === 1 ? "block" : "blocks"}</span>
-		</div> -->
+		<div class="flex items-center gap-1">
+			<button
+				class="p-2 rounded transition-colors shrink-0"
+				aria-label="Open Analytics"
+				onclick={onOpenAnalytics}
+				{@attach icon("bar-chart-2")}
+			></button>
+
+			<button
+				class="p-2 rounded transition-colors shrink-0"
+				aria-label="Open Settings"
+				onclick={onOpenSettings}
+				{@attach icon("settings")}
+			></button>
+		</div>
 	</div>
 
 	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>

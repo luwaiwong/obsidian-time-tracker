@@ -1,6 +1,8 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import type { TimeRecord } from "../types";
+import type { Project, TimeRecord } from "../types";
+import ProjectGrid from "../components/ProjectGrid.svelte";
+import { mount, unmount } from "svelte";
 
 export class EditRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -8,8 +10,10 @@ export class EditRecordModal extends Modal {
 	onSave: () => void;
 
 	private titleInput: string;
+	private selectedProject: Project | null = null;
 	private startTimeInput: string;
 	private endTimeInput: string;
+	private gridComponent: Record<string, unknown> | null = null;
 
 	constructor(
 		app: App,
@@ -23,6 +27,7 @@ export class EditRecordModal extends Modal {
 		this.onSave = onSave;
 
 		this.titleInput = record.title;
+		this.selectedProject = plugin.getProjectById(record.projectId) || null;
 		this.startTimeInput = this.toDateTimeLocal(record.startTime);
 		this.endTimeInput = record.endTime
 			? this.toDateTimeLocal(record.endTime)
@@ -36,6 +41,7 @@ export class EditRecordModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
+		contentEl.addClass("project-selector-modal");
 
 		contentEl.createEl("h2", { text: "Edit Record Entry" });
 
@@ -50,6 +56,23 @@ export class EditRecordModal extends Modal {
 						this.titleInput = value;
 					}),
 			);
+
+		// Project selector dropdown
+		const gridContainer = contentEl.createDiv("project-grid-container");
+
+		this.gridComponent = mount(ProjectGrid, {
+			target: gridContainer,
+			props: {
+				plugin: this.plugin,
+				selectedProjectId: this.selectedProject?.id || null,
+				selectionMode: true,
+				dropdownMode: true,
+				onProjectClick: (project: Project) => {
+					this.selectedProject = project;
+					this.updateGrid(gridContainer);
+				},
+			},
+		});
 
 		const startSetting = new Setting(contentEl)
 			.setName("Start Time")
@@ -116,7 +139,31 @@ export class EditRecordModal extends Modal {
 		});
 	}
 
+	private updateGrid(container: HTMLElement): void {
+		if (this.gridComponent) {
+			unmount(this.gridComponent);
+		}
+		container.empty();
+		this.gridComponent = mount(ProjectGrid, {
+			target: container,
+			props: {
+				plugin: this.plugin,
+				selectedProjectId: this.selectedProject?.id || null,
+				selectionMode: true,
+				dropdownMode: true,
+				onProjectClick: (project: Project) => {
+					this.selectedProject = project;
+					this.updateGrid(container);
+				},
+			},
+		});
+	}
+
 	onClose() {
+		if (this.gridComponent) {
+			unmount(this.gridComponent);
+			this.gridComponent = null;
+		}
 		const { contentEl } = this;
 		contentEl.empty();
 	}
@@ -148,7 +195,14 @@ export class EditRecordModal extends Modal {
 			return;
 		}
 
+		if (!this.selectedProject) {
+			new Notice("Please select a project");
+			return;
+		}
+
 		this.plugin.timesheetData.records[index].title = this.titleInput.trim();
+		this.plugin.timesheetData.records[index].projectId =
+			this.selectedProject.id;
 		this.plugin.timesheetData.records[index].startTime = newStart;
 		this.plugin.timesheetData.records[index].endTime = newEnd;
 

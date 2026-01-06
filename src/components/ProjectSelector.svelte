@@ -2,7 +2,7 @@
 	import ProjectCard from "./ProjectCard.svelte";
 	import type { Project, TimeRecord } from "../types";
 	import type TimeTrackerPlugin from "../../main";
-	import { on } from "svelte/events";
+	import { slide } from "svelte/transition";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -12,6 +12,7 @@
 		onProjectClick?: (project: Project) => void;
 		selectedProjectId?: number | null;
 		selectionMode?: boolean;
+		dropdownMode?: boolean;
 	}
 	let {
 		plugin,
@@ -19,7 +20,10 @@
 		onProjectClick,
 		selectedProjectId = null,
 		selectionMode = false,
+		dropdownMode = false,
 	}: Props = $props();
+
+	let dropdownOpen = $state(false);
 
 	let currentTime = $state(Date.now());
 	let interval: number | undefined;
@@ -40,15 +44,17 @@
 	function handleProjectClick(project: Project) {
 		if (onProjectClick) {
 			onProjectClick(project);
-			return;
+		} else {
+			const isRunning = isProjectRunning(project.id);
+			if (isRunning) {
+				plugin.stopTimer(project.id);
+			} else {
+				plugin.startTimer(project.id);
+			}
 		}
 
-		const isRunning = isProjectRunning(project.id);
-
-		if (isRunning) {
-			plugin.stopTimer(project.id);
-		} else {
-			plugin.startTimer(project.id);
+		if (dropdownMode) {
+			dropdownOpen = false;
 		}
 	}
 
@@ -113,30 +119,93 @@
 	let gridStyle = $derived(
 		`grid-template-columns: repeat(${gridColumns}, 1fr);`,
 	);
+	let selectedProject = $derived(
+		selectedProjectId
+			? projects.find((p) => p.id === selectedProjectId)
+			: null,
+	);
 </script>
 
-<div class="p-4">
-	<div class="grid w-full gap-4" style={gridStyle}>
-		{#each visibleProjects as project (project.id)}
-			<ProjectCard
-				{project}
-				isRunning={selectionMode ? false : isProjectRunning(project.id)}
-				isSelected={selectionMode && selectedProjectId === project.id}
-				currentDuration={selectionMode
-					? 0
-					: getRunningDuration(project.id)}
-				onClick={() => handleProjectClick(project)}
-				{gridColumns}
-			/>
-		{/each}
-	</div>
+{#if dropdownMode}
+	<div
+		class="relative w-full h-fit bg-(--background-primary-alt) rounded-lg overflow-clip"
+	>
+		<button
+			type="button"
+			style="
+				flex: 1;
+				justify-content: space-between;
+				align-items:center;
+				{selectedProject ? `background-color: ${selectedProject.color};` : ''}
+				cursor:pointer;
+				width: 100%;
+				height: 40px;
+				border-radius: 0.5rem;
+			"
+			onclick={() => (dropdownOpen = !dropdownOpen)}
+		>
+			<span class="flex items-center gap-2">
+				{#if selectedProject}
+					<p class="text-[1rem]">{selectedProject.icon}</p>
 
-	{#if visibleProjects.length === 0}
-		<div class="px-4 py-12 text-center text-[var(--text-muted)]">
-			<p class="my-2">No projects yet!</p>
-			<p class="my-2 text-sm opacity-80">
-				Create a project to start tracking time.
-			</p>
+					<p class="text-[1rem]">{selectedProject.name}</p>
+				{:else}
+					Select a project
+				{/if}
+			</span>
+			<span
+				class="text-[1rem] text-(--text-muted) transition-transform duration-200"
+				class:rotate-180={dropdownOpen}>▼</span
+			>
+		</button>
+
+		{#if dropdownOpen}
+			<div
+				class="overflow-hidden rounded bg-transparent p-2"
+				transition:slide={{ duration: 150 }}
+			>
+				<div class="grid w-full gap-2" style={gridStyle}>
+					{#each visibleProjects as project (project.id)}
+						<ProjectCard
+							{project}
+							isRunning={false}
+							isSelected={selectedProjectId === project.id}
+							currentDuration={0}
+							onClick={() => handleProjectClick(project)}
+							{gridColumns}
+						/>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+{:else}
+	<div class="p-4">
+		<div class="grid w-full gap-4" style={gridStyle}>
+			{#each visibleProjects as project (project.id)}
+				<ProjectCard
+					{project}
+					isRunning={selectionMode
+						? false
+						: isProjectRunning(project.id)}
+					isSelected={selectionMode &&
+						selectedProjectId === project.id}
+					currentDuration={selectionMode
+						? 0
+						: getRunningDuration(project.id)}
+					onClick={() => handleProjectClick(project)}
+					{gridColumns}
+				/>
+			{/each}
 		</div>
-	{/if}
-</div>
+
+		{#if visibleProjects.length === 0}
+			<div class="px-4 py-12 text-center text-(--text-muted)">
+				<p class="my-2">No projects yet!</p>
+				<p class="my-2 text-sm opacity-80">
+					Create a project to start tracking time.
+				</p>
+			</div>
+		{/if}
+	</div>
+{/if}

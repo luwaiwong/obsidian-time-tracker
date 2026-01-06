@@ -136,7 +136,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.isLoading = true;
 		console.log("Loading timesheet...");
 		try {
-			const file = await this.app.vault.getAbstractFileByPath(
+			const file = this.app.vault.getAbstractFileByPath(
 				this.settings.timesheetPath,
 			);
 			console.log("File found:", file);
@@ -220,7 +220,8 @@ export default class TimeTrackerPlugin extends Plugin {
 	startTimer(
 		projectId: number = -1,
 		title: string = "",
-		startTime: Date = new Date(),
+		startTime?: Date,
+		endTime?: Date,
 	) {
 		const project = this.getProjectById(projectId);
 		if (!project) return;
@@ -279,6 +280,18 @@ export default class TimeTrackerPlugin extends Plugin {
 			}
 		}
 
+		this.saveTimesheet();
+		this.refreshViews();
+	}
+
+	/** Find record by ID and extend its time */
+	repeatRecord(recordId: number, endTime: Date) {
+		const record = this.timesheetData.records.find(
+			(r) => r.id === recordId,
+		);
+		if (!record) return;
+
+		record.endTime = endTime;
 		this.saveTimesheet();
 		this.refreshViews();
 	}

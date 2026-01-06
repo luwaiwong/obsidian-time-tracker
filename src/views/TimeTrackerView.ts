@@ -79,6 +79,15 @@ export class TimeTrackerView extends ItemView {
 			target: content,
 			props: {
 				plugin: this.plugin,
+				onOpenAnalytics: () => {
+					this.plugin.activateAnalyticsView();
+				},
+				onOpenSettings: () => {
+					// @ts-ignore
+					this.plugin.app.setting.open();
+					// @ts-ignore
+					this.plugin.app.setting.openTabById("time-tracker");
+				},
 			},
 		});
 	}

@@ -8,7 +8,7 @@ import ProjectGrid from "../components/ProjectGrid.svelte";
 import { mount, unmount } from "svelte";
 import { title } from "process";
 
-export class ProjectSelectorModal extends Modal {
+export class CreateRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
 	onComplete: () => void;
 	isSwitching: boolean;

@@ -1,11 +1,7 @@
-/**
- * Utility functions for the time tracker plugin
- */
-
 import type { TimeRecord } from "../types";
 
 /**
- * Format duration in milliseconds to human-readable string
+ * format duration in format hh:mm:ss
  */
 export function formatDuration(
 	ms: number,
@@ -33,8 +29,33 @@ export function formatDuration(
 }
 
 /**
- * Get total duration for a project within a time range
- * Works with the TimeRecord structure (uses projectId and Date objects)
+ * format duration for timer display with h/m/s notation
+ * - under 1 hour: shows 00m 00s
+ * - 1-99 hours: shows 00h 00m
+ * - 100+ hours: shows 000h
+ */
+export function formatNaturalDuration(ms: number): string {
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	// 100+ hours: just show hours
+	if (hours >= 100) {
+		return `${hours}h`;
+	}
+
+	// 1+ hours: show hours and minutes
+	if (hours > 0) {
+		return `${String(hours)}h ${String(minutes).padStart(2, "0")}m`;
+	}
+
+	// Under 1 hour: show minutes and seconds
+	return `${String(minutes)}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+/**
+ * get total duration for a project within a time range
  */
 export function getProjectDuration(
 	projectId: number,
@@ -63,7 +84,7 @@ export function getProjectDuration(
 }
 
 /**
- * Get time range boundaries
+ * get time range boundaries
  */
 export function getTimeRange(
 	range: "day" | "week" | "month" | "year",
@@ -105,7 +126,7 @@ export function getTimeRange(
 }
 
 /**
- * Format date to readable string
+ * format date to readable string
  */
 export function formatDate(timestamp: number): string {
 	const date = new Date(timestamp);
@@ -113,7 +134,7 @@ export function formatDate(timestamp: number): string {
 }
 
 /**
- * Format datetime to readable string
+ * format datetime to readable string
  */
 export function formatDateTime(timestamp: number | Date): string {
 	const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
@@ -121,7 +142,7 @@ export function formatDateTime(timestamp: number | Date): string {
 }
 
 /**
- * Format time of day (HH:MM)
+ * format time of day (hh:mm)
  */
 export function formatTimeOfDay(timestamp: number | Date): string {
 	const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
