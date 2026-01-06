@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
-	import type { Project } from "../types";
+	import type { Project, TimeRecord } from "../types";
 	import { formatDuration } from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
@@ -12,9 +12,11 @@
 		plugin: TimeTrackerPlugin;
 		onOpenAnalytics: () => void;
 		onOpenSettings: () => void;
+		onEditRecord: (record: TimeRecord, project: Project) => void;
 	}
 
-	let { plugin, onOpenAnalytics, onOpenSettings }: Props = $props();
+	let { plugin, onOpenAnalytics, onOpenSettings, onEditRecord }: Props =
+		$props();
 
 	let calendarEl: HTMLDivElement;
 	let calendar: Calendar | null = null;
@@ -78,16 +80,17 @@
 			const clampedEnd = Math.min(recordEnd, end);
 
 			events.push({
-				id: `record-${record.id}`,
+				id: `${record.id}`,
 				title: `${project.icon} ${project.name}`,
 				start: new Date(clampedStart),
 				end: new Date(clampedEnd),
 				backgroundColor: project.color,
-				borderColor: project.color,
+				borderColor: "grey",
 				extendedProps: {
 					project,
 					duration: clampedEnd - clampedStart,
 					isRunning: false,
+					record: record,
 				},
 			});
 		}
@@ -114,6 +117,7 @@
 					project,
 					duration: clampedEnd - clampedStart,
 					isRunning: true,
+					record: timer,
 				},
 			});
 		}
@@ -171,24 +175,44 @@
 				minute: "2-digit",
 				hour12: false,
 			},
+			eventMinHeight: 0,
+			eventShortHeight: 100000,
 			events: buildCalendarEvents(),
+			eventClick: (info) => {
+				if (
+					info.event.extendedProps?.project &&
+					info.event.extendedProps?.record
+				) {
+					onEditRecord(
+						info.event.extendedProps.record,
+						info.event.extendedProps.project,
+					);
+				}
+			},
 			eventContent: (arg) => {
 				const duration = arg.event.extendedProps?.duration || 0;
 				const isRunning = arg.event.extendedProps?.isRunning || false;
 
-				return {
-					html: `
-						<div class="flex flex-col gap-0.5">
-							<div class="font-bold text-sm">${arg.event.title}</div>
-							<div class="text-xs opacity-95">
-								${arg.timeText}
+				// if duration under 30 min, just show color
+				if (duration < 30 * 60 * 1000) {
+					return {
+						html: `
+							<div class="fc-event-main-container flex flex-col gap-0.5">
 							</div>
-							<div class="text-xs opacity-90 font-semibold">
-								${isRunning ? "Running • " : ""}${formatDuration(duration, true)}
+						`,
+					};
+				} else {
+					return {
+						html: `
+							<div class="fc-event-main-container flex flex-col gap-0.5 justify-center">
+								<div class="font-bold text-sm">${arg.event.title}</div>
+								<div class="text-xs opacity-95">
+									${arg.timeText}
+								</div>
 							</div>
-						</div>
-					`,
-				};
+						`,
+					};
+				}
 			},
 		});
 
@@ -318,11 +342,15 @@
 	}
 
 	:global(.fc .fc-timegrid-now-indicator-line) {
-		border-color: var(--text-accent);
-		border-width: 2px;
+		/*border-color: var(--text-accent);*/
+		/*border-width: 2px;*/
 	}
 
 	:global(.fc .fc-timegrid-now-indicator-arrow) {
-		border-color: var(--text-accent);
+		/*border-color: var(--text-accent);*/
+	}
+	/* hide details only when FC marks it as short */
+	:global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
+		display: none;
 	}
 </style>

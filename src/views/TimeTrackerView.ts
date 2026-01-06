@@ -3,6 +3,8 @@ import type TimeTrackerPlugin from "../../main";
 import Overview from "../components/Overview.svelte";
 import Schedule from "../components/Schedule.svelte";
 import { mount, unmount } from "svelte";
+import { EditRecordModal } from "..//modals/EditRecordModal";
+import { Project, TimeRecord } from "src/types";
 
 export const VIEW_TYPE_TIME_TRACKER = "time-tracker-view";
 
@@ -87,6 +89,16 @@ export class TimeTrackerView extends ItemView {
 					this.plugin.app.setting.open();
 					// @ts-ignore
 					this.plugin.app.setting.openTabById("time-tracker");
+				},
+				onEditRecord: (record: TimeRecord, project: Project) => {
+					new EditRecordModal(
+						this.plugin.app,
+						this.plugin,
+						record,
+						() => {
+							this.refresh();
+						},
+					).open();
 				},
 			},
 		});

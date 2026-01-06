@@ -55,6 +55,15 @@ export function formatNaturalDuration(ms: number): string {
 }
 
 /**
+ * get duration for a time record
+ */
+export function getRecordDuration(record: TimeRecord): number {
+	if (!record.endTime)
+		return new Date().getTime() - record.startTime.getTime();
+	return record.endTime.getTime() - record.startTime.getTime();
+}
+
+/**
  * get total duration for a project within a time range
  */
 export function getProjectDuration(
