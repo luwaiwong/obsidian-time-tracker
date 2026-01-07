@@ -1,8 +1,4 @@
 <script lang="ts">
-	import { derived } from "svelte/store";
-	import TimeTrackerPlugin from "../../main";
-	import { TimeRecord } from "../types";
-
 	interface Props {
 		startDate: Date;
 		endDate?: Date | null;

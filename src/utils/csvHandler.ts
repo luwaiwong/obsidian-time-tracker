@@ -93,7 +93,10 @@ export class CSVHandler {
 		const icon = parts[3];
 		const color = this.normalizeColor(parts[4]);
 		const archived = parts[5] === "1" || parts[5].toLowerCase() === "true";
-
+		let categoryId = parseInt(parts[6]);
+		if (isNaN(categoryId)) {
+			categoryId = -1;
+		}
 		// Determine order and categoryId from existing projects
 		const order = data.projects.length;
 
@@ -102,7 +105,7 @@ export class CSVHandler {
 			name,
 			icon,
 			color,
-			categoryId: -1,
+			categoryId,
 			archived,
 			order,
 		});
@@ -234,6 +237,7 @@ export class CSVHandler {
 					this.escapeCSVField(project.icon),
 					project.color,
 					project.archived ? "1" : "0",
+					project.categoryId,
 				].join(","),
 			);
 		}

@@ -45,16 +45,15 @@
 		};
 	});
 
-	// Get projects sorted: non-archived first, then archived at end
 	let projects = $derived(() => {
-		const all = [...plugin.timesheetData.projects];
+		const projects = [...plugin.timesheetData.projects];
 
-		// Sort: non-archived first by order, then archived by order
-		return all.sort((a, b) => {
+		// sort projects by category (reverse order), then by archived
+		return projects.sort((a, b) => {
 			if (a.archived !== b.archived) {
 				return a.archived ? 1 : -1;
 			}
-			return a.order - b.order;
+			return b.categoryId - a.categoryId;
 		});
 	});
 

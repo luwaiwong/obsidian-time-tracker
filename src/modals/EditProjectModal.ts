@@ -257,8 +257,8 @@ export class EditProjectModal extends Modal {
 		this.project.color = this.colorInput;
 		this.project.categoryId = this.categoryId;
 
-		await this.plugin.saveTimesheet();
-		this.plugin.refreshViews();
+		this.plugin.editProject(this.project);
+		
 		this.onSave();
 		this.close();
 	}
