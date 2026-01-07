@@ -6,6 +6,7 @@ import {
 } from "./src/views/TimeTrackerView";
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
 import { CSVHandler } from "./src/utils/csvHandler";
+import { BackupHandler } from "./src/utils/backupHandler";
 import type {
 	PluginSettings,
 	TimesheetData,
@@ -15,6 +16,7 @@ import type {
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
 import { ImportModal } from "./src/modals/ImportSTTModal";
 import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
+import { BackupViewerModal } from "./src/modals/BackupViewerModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -43,6 +45,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		categories: [],
 	};
 	csvHandler: CSVHandler;
+	backupHandler: BackupHandler;
 	private timesheetFile: TFile | null = null;
 	error: string | null = null;
 	isLoading: boolean = true;
@@ -51,6 +54,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.csvHandler = new CSVHandler(this.app.vault);
+		this.backupHandler = new BackupHandler(this.app.vault);
 
 		this.registerView(
 			VIEW_TYPE_TIME_TRACKER,
@@ -89,6 +93,11 @@ export default class TimeTrackerPlugin extends Plugin {
 			name: "Resolve Conflicts",
 			callback: () => new ConflictResolverModal(this.app, this).open(),
 		});
+		this.addCommand({
+			id: "view-backups",
+			name: "View Backups",
+			callback: () => new BackupViewerModal(this.app, this).open(),
+		});
 
 		this.registerMarkdownCodeBlockProcessor(
 			"time-tracker",
@@ -102,8 +111,17 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		this.app.workspace.onLayoutReady(async () => {
 			await this.loadTimesheet();
+			await this.backupHandler.createBackup(this.settings.timesheetPath);
 			this.activateView();
 		});
+
+		// backup every 3 hours
+		this.registerInterval(
+			window.setInterval(
+				() => this.backupHandler.createBackup(this.settings.timesheetPath),
+				3 * 60 * 60 * 1000,
+			),
+		);
 
 		// reload timesheet when app comes back to foreground for mobile
 		this.registerDomEvent(document, "visibilitychange", () => {
@@ -475,6 +493,17 @@ export default class TimeTrackerPlugin extends Plugin {
 			return undefined;
 		}
 		return this.timesheetData.projects.find((p) => p.id === id);
+	}
+
+	editProject(project: Project): void {
+		const index = this.timesheetData.projects.findIndex(
+			(p) => p.id === project.id,
+		);
+		if (index !== -1) {
+			this.timesheetData.projects[index] = project;
+		}
+		this.saveTimesheet();
+		this.refreshViews();
 	}
 
 	// ----- VIEWS -----

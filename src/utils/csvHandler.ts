@@ -23,6 +23,10 @@ export class CSVHandler {
 
 	async parseTimesheet(file: TFile): Promise<TimesheetData> {
 		const content = await this.vault.read(file);
+		return this.parseTimesheetContent(content);
+	}
+
+	parseTimesheetContent(content: string): TimesheetData {
 		const lines = content
 			.split("\n")
 			.filter((line) => line.trim().length > 0);
