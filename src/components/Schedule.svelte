@@ -173,8 +173,8 @@
 	function getCurrentScrollTime(): string {
 		const now = new Date();
 		const hours = now.getHours();
-		// scroll to 3 hours after current time, clamped to 23:00
-		const scrollHour = Math.min(23, hours + 3);
+		// scroll to current time, clamped to 23:00
+		const scrollHour = Math.max(0, hours - 4);
 		return `${String(scrollHour).padStart(2, "0")}:00:00`;
 	}
 

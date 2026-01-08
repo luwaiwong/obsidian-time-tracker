@@ -16,11 +16,14 @@ export class EditRecordModal extends Modal {
 	private startTimeInput: Date;
 	private endTimeInput: Date | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
-	private timeComponent: Record<string, unknown> | null = null;
+	private startTimeComponent: Record<string, unknown> | null = null;
+	private endTimeComponent: Record<string, unknown> | null = null;
 	private titleComponent: Record<string, unknown> | null = null;
 
 	private gridContainer: HTMLElement;
 	private timeContainer: HTMLElement;
+	private startTimeContainer: HTMLElement | null = null;
+	private endTimeContainer: HTMLElement | null = null;
 	private titleContainer: HTMLElement;
 
 	constructor(
@@ -90,7 +93,19 @@ export class EditRecordModal extends Modal {
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
 		this.timeContainer = contentEl.createDiv("time-grid-container");
-		this.timeComponent = this.mountTimeComponent(this.timeContainer);
+		this.timeContainer.style.display = "flex";
+		this.timeContainer.style.flexDirection = "column";
+		this.timeContainer.style.gap = "12px";
+
+		this.startTimeContainer = contentEl.createDiv();
+		this.timeContainer.appendChild(this.startTimeContainer);
+		this.startTimeComponent = this.mountStartTimeComponent(this.startTimeContainer);
+
+		if (this.record.endTime !== null) {
+			this.endTimeContainer = contentEl.createDiv();
+			this.timeContainer.appendChild(this.endTimeContainer);
+			this.endTimeComponent = this.mountEndTimeComponent(this.endTimeContainer);
+		}
 
 		// bottom buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
@@ -140,12 +155,8 @@ export class EditRecordModal extends Modal {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 		}
-		if (this.timeComponent) {
-			unmount(this.timeComponent);
-		}
 		container.empty();
 		this.gridComponent = this.mountGridComponent(this.gridContainer);
-		this.timeComponent = this.mountTimeComponent(this.timeContainer);
 	}
 
 	onClose() {
@@ -153,9 +164,13 @@ export class EditRecordModal extends Modal {
 			unmount(this.gridComponent);
 			this.gridComponent = null;
 		}
-		if (this.timeComponent) {
-			unmount(this.timeComponent);
-			this.timeComponent = null;
+		if (this.startTimeComponent) {
+			unmount(this.startTimeComponent);
+			this.startTimeComponent = null;
+		}
+		if (this.endTimeComponent) {
+			unmount(this.endTimeComponent);
+			this.endTimeComponent = null;
 		}
 		if (this.titleComponent) {
 			unmount(this.titleComponent);
@@ -165,17 +180,48 @@ export class EditRecordModal extends Modal {
 		contentEl.empty();
 	}
 
-	mountTimeComponent(container: HTMLElement) {
+	mountStartTimeComponent(container: HTMLElement) {
 		return mount(TimeSelector, {
 			target: container,
 			props: {
-				startDate: this.startTimeInput,
-				endDate: this.endTimeInput,
-				showEnd: this.record.endTime !== null,
-				onStartChanged: (date) => {
+				value: this.startTimeInput,
+				title: "Start Time",
+				customButton: {
+					label: "Now",
+					onClick: () => {
+						this.startTimeInput = new Date();
+						if (this.startTimeComponent) {
+							unmount(this.startTimeComponent);
+						}
+						container.empty();
+						this.startTimeComponent = this.mountStartTimeComponent(container);
+					},
+				},
+				onChanged: (date: Date) => {
 					this.startTimeInput = date;
 				},
-				onEndChanged: (date) => {
+			},
+		});
+	}
+
+	mountEndTimeComponent(container: HTMLElement) {
+		return mount(TimeSelector, {
+			target: container,
+			props: {
+				value: this.endTimeInput || new Date(),
+				title: "End Time",
+				customButton: {
+					label: "Now",
+					onClick: () => {
+						this.endTimeInput = new Date();
+						if (this.endTimeComponent) {
+							unmount(this.endTimeComponent);
+						}
+						container.empty();
+						this.endTimeComponent = this.mountEndTimeComponent(container);
+					},
+				},
+				onChanged: (date: Date) => {
 					this.endTimeInput = date;
 				},
 			},

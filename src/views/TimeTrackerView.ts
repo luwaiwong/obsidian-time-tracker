@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
-import Overview from "../components/Overview.svelte";
+import ControlBar from "../components/ControlBar.svelte";
 import Schedule from "../components/Schedule.svelte";
 import { mount, unmount } from "svelte";
 import { EditRecordModal } from "..//modals/EditRecordModal";
@@ -53,7 +53,7 @@ export class TimeTrackerView extends ItemView {
 		// Header with buttons and timer
 		const header = container.createDiv("time-tracker-header");
 
-		this.headerComponent = mount(Overview, {
+		this.headerComponent = mount(ControlBar, {
 			target: header,
 			props: {
 				plugin: this.plugin,

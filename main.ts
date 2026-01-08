@@ -278,7 +278,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.timesheetData.records.push(newRecord);
 
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 	}
 
 	/** start tracking time for a project */
@@ -288,8 +288,10 @@ export default class TimeTrackerPlugin extends Plugin {
 		startTime?: Date,
 		endTime?: Date,
 	) {
-		const project = this.getProjectById(projectId);
-		if (!project) return;
+		let project = this.getProjectById(projectId);
+		if (projectId === -1) {
+			project = undefined;
+		}
 
 		const now = new Date();
 
@@ -300,23 +302,25 @@ export default class TimeTrackerPlugin extends Plugin {
 			if (lastRecord && lastRecord.endTime) {
 				const gap = now.getTime() - lastRecord.endTime.getTime();
 				if (gap > 0) {
-					// extend record if the project is the same, create new otherwise
-					if (lastRecord.projectId === project.id) {
-						console.log("extend record");
+					// extend record if the project is the same and start time is the same as last project end time(within 10 minutes)
+					const startTimeSame = startTime ? Math.abs(lastRecord.endTime.getTime() - startTime.getTime()) < 10 * 60 * 1000 : true;
+					if (project && lastRecord.projectId === project.id && startTimeSame) {
 						const index = this.timesheetData.records.findIndex(
 							(r) => r.id === lastRecord.id,
 						);
 						if (index !== -1) {
 							this.timesheetData.records[index].endTime = now;
 						}
-					} else {
+					} 
+					// otherwise we create a new record
+					else {
 						const newRecord: TimeRecord = {
 							id: CSVHandler.getNextId(
 								this.timesheetData.records,
 							),
-							projectId: project.id,
-							startTime: lastRecord.endTime,
-							endTime: now,
+							projectId: project ? project.id : -1,
+							startTime: startTime ?? lastRecord.endTime,
+							endTime: endTime ?? now,
 							title: title,
 						};
 						this.timesheetData.records.push(newRecord);
@@ -337,17 +341,17 @@ export default class TimeTrackerPlugin extends Plugin {
 				// create a new record with null endTime (running timer)
 				const newRecord: TimeRecord = {
 					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectId: project.id,
-					startTime: now,
+					projectId: project ? project.id : -1,
+					startTime: startTime ?? now,
 					endTime: null,
-					title: "",
+					title: title,
 				};
 				this.timesheetData.records.push(newRecord);
 			}
 		}
 
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 	}
 
 	/** find record by ID and extend its time */
@@ -385,7 +389,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.timesheetData.records[recordIndex].endTime = new Date();
 
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 	}
 
 	/*
@@ -404,7 +408,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		};
 
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 		return true;
 	}
 
@@ -418,7 +422,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 	}
 
 	/** set the last stopped record (completed, with endTime) */
@@ -503,7 +507,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.timesheetData.projects[index] = project;
 		}
 		this.saveTimesheet();
-		this.refreshViews();
+		// this.refreshViews();
 	}
 
 	// ----- VIEWS -----

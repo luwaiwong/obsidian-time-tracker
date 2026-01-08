@@ -4,6 +4,7 @@
 		placeholder?: string;
 		style?: string;
 		onInput?: (value: string) => void;
+		onKeyDown?: (e: KeyboardEvent) => void;
 	}
 
 	let {
@@ -11,12 +12,17 @@
 		placeholder = "",
 		style = "",
 		onInput,
+		onKeyDown,
 	}: Props = $props();
 
 	function handleInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		value = input.value;
 		onInput?.(input.value);
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		onKeyDown?.(e);
 	}
 </script>
 
@@ -27,4 +33,5 @@
 	{value}
 	{placeholder}
 	oninput={handleInput}
+	onkeydown={handleKeyDown}
 />

@@ -1,12 +1,12 @@
-import { App, Modal, Notice, setIcon } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
-import { CreateProjectModal } from "./CreateProjectModal";
 import ProjectSelector from "../components/ProjectSelector.svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
+import RecentRecords from "../components/RecentRecords.svelte";
+import TimeCards from "../components/TimeCards.svelte";
 import { mount, unmount } from "svelte";
-import { formatDuration, formatDateTime } from "../utils/timeUtils";
 
 export class CreateRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -19,8 +19,14 @@ export class CreateRecordModal extends Modal {
 	private startTime: Date;
 	private endTime: Date | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
-	private timeComponent: Record<string, unknown> | null = null;
+	private startTimeComponent: Record<string, unknown> | null = null;
+	private endTimeComponent: Record<string, unknown> | null = null;
 	private titleComponent: Record<string, unknown> | null = null;
+	private recentRecordsComponent: Record<string, unknown> | null = null;
+	private timeCardsComponent: Record<string, unknown> | null = null;
+	private startTimeContainer: HTMLElement | null = null;
+	private endTimeContainer: HTMLElement | null = null;
+	private timeCardsContainer: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -61,10 +67,57 @@ export class CreateRecordModal extends Modal {
 
 		contentEl.createEl("h2", { text: modalTitle });
 
+		this.scope.register([], "Enter", (e) => {
+			e.preventDefault();
+			this.save();
+			return false;
+		});
+		
+
+
+		// time section
+		// contentEl.createEl("h3", { text: "Time" });
+		// const timeDivider = contentEl.createEl("hr");
+		// timeDivider.style.cssText =
+		// 	"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
+
+		// time info cards 
+		this.timeCardsContainer = contentEl.createDiv();
+		this.mountTimeCards();
+
+		// recent records section
+		const recentContainer = contentEl.createDiv();
+		this.recentRecordsComponent = mount(RecentRecords, {
+			target: recentContainer,
+			props: {
+				plugin: this.plugin,
+				maxRecords: 3,
+				onRefresh: () => {
+					this.onComplete();
+					this.close();
+				},
+			},
+		});
+
+
+		// time selectors
+		const timeContainer = contentEl.createDiv("time-grid-container");
+		timeContainer.style.display = "flex";
+		timeContainer.style.flexDirection = "column";
+		timeContainer.style.gap = "12px";
+		timeContainer.style.marginTop = "4px";
+		this.startTimeContainer = contentEl.createDiv();
+		timeContainer.appendChild(this.startTimeContainer);
+		this.startTimeComponent = this.mountStartTimeComponent(this.startTimeContainer);
+
+		if (this.plugin.settings.retroactiveTrackingEnabled) {
+			this.endTimeContainer = contentEl.createDiv();
+			timeContainer.appendChild(this.endTimeContainer);
+			this.endTimeComponent = this.mountEndTimeComponent(this.endTimeContainer);
+		}
+
 		// title section
-		const titleLabel = contentEl.createEl("p", { text: "Title" });
-		titleLabel.style.cssText =
-			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+		contentEl.createEl("h3", { text: "Title" });
 		const titleDivider = contentEl.createEl("hr");
 		titleDivider.style.cssText =
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
@@ -80,44 +133,9 @@ export class CreateRecordModal extends Modal {
 				},
 			},
 		});
-
-		// repeat last button (if there's a last record)
-		if (this.lastRecord) {
-			const lastProject = this.plugin.getProjectById(
-				this.lastRecord.projectId,
-			);
-			if (lastProject) {
-				const repeatContainer = contentEl.createDiv();
-				repeatContainer.style.cssText = "margin: 8px 0;";
-				const repeatBtn = repeatContainer.createEl("button", {
-					cls: "mod-muted",
-				});
-				repeatBtn.style.display = "flex";
-				repeatBtn.style.alignItems = "center";
-				repeatBtn.style.gap = "8px";
-				repeatBtn.style.width = "100%";
-				repeatBtn.style.cursor = "pointer";
-				// repeatBtn.style.backgroundColor = "var(--background-modifier-hover)";
-
-				const iconSpan = repeatBtn.createSpan();
-				setIcon(iconSpan, "repeat");
-
-				repeatBtn.createSpan({
-					text: `Repeat: ${lastProject.name}${this.lastRecord.title ? ` - ${this.lastRecord.title}` : ""}`,
-				});
-
-				repeatBtn.addEventListener("click", () => {
-					this.selectedProject = lastProject;
-					this.titleInput = this.lastRecord?.title || "";
-					this.save();
-				});
-			}
-		}
-
+		
 		// project section
-		const projectLabel = contentEl.createEl("p", { text: "Project" });
-		projectLabel.style.cssText =
-			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
+		const projectLabel = contentEl.createEl("h3", { text: "Project" });
 		const projectDivider = contentEl.createEl("hr");
 		projectDivider.style.cssText =
 			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
@@ -125,31 +143,6 @@ export class CreateRecordModal extends Modal {
 
 		this.gridComponent = this.mountGridComponent(gridContainer);
 
-		// time section (only show for retroactive tracking)
-		if (this.plugin.settings.retroactiveTrackingEnabled) {
-			const timeLabel = contentEl.createEl("p", { text: "Time" });
-			timeLabel.style.cssText =
-				"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
-			const timeDivider = contentEl.createEl("hr");
-			timeDivider.style.cssText =
-				"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
-			const timeContainer = contentEl.createDiv("time-grid-container");
-
-			this.timeComponent = mount(TimeSelector, {
-				target: timeContainer,
-				props: {
-					startDate: this.startTime,
-					endDate: this.endTime,
-					showEnd: true,
-					onStartChanged: (date: Date) => {
-						this.startTime = date;
-					},
-					onEndChanged: (date: Date) => {
-						this.endTime = date;
-					},
-				},
-			});
-		}
 
 		// action buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
@@ -169,7 +162,7 @@ export class CreateRecordModal extends Modal {
 		});
 
 		const actionText = this.plugin.settings.retroactiveTrackingEnabled
-			? "Record Time"
+			? "Record"
 			: "Start";
 		const saveButton = buttonContainer.createEl("button", {
 			text: actionText,
@@ -203,12 +196,78 @@ export class CreateRecordModal extends Modal {
 		});
 	}
 
+	private mountStartTimeComponent(container: HTMLElement) {
+		return mount(TimeSelector, {
+			target: container,
+			props: {
+				value: this.startTime,
+				title: "Start Time",
+				maxDate: this.plugin.settings.retroactiveTrackingEnabled && this.endTime
+					? this.endTime
+					: undefined,
+				customButton: this.lastRecord?.endTime ? {
+					label: "Last",
+					onClick: () => {
+						if (this.lastRecord?.endTime) {
+							this.startTime = this.lastRecord.endTime;
+							this.mountTimeCards();
+						}
+					},
+				} : undefined,
+				onChanged: (date: Date) => {
+					this.startTime = date;
+					this.mountTimeCards();
+				},
+			},
+		});
+	}
+
+	private mountEndTimeComponent(container: HTMLElement) {
+		return mount(TimeSelector, {
+			target: container,
+			props: {
+				value: this.endTime || new Date(),
+				title: "End Time",
+				minDate: this.startTime,
+				customButton: {
+					label: "Now",
+					onClick: () => {
+						this.endTime = new Date();
+						this.mountTimeCards();
+					},
+				},
+				onChanged: (date: Date) => {
+					this.endTime = date;
+					this.mountTimeCards();
+				},
+			},
+		});
+	}
+
 	private updateGrid(container: HTMLElement): void {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
 		}
 		container.empty();
 		this.gridComponent = this.mountGridComponent(container);
+	}
+
+	private mountTimeCards(): void {
+		if (!this.timeCardsContainer) return;
+		if (this.timeCardsComponent) {
+			unmount(this.timeCardsComponent);
+		}
+		this.timeCardsContainer.empty();
+
+		this.timeCardsComponent = mount(TimeCards, {
+			target: this.timeCardsContainer,
+			props: {
+				lastRecordEndTime: this.lastRecord?.endTime || null,
+				startTime: this.startTime,
+				endTime: this.endTime,
+				isRetroactive: this.plugin.settings.retroactiveTrackingEnabled,
+			},
+		});
 	}
 
 	private autoFillTitle(project: Project): void {
@@ -226,21 +285,33 @@ export class CreateRecordModal extends Modal {
 			unmount(this.gridComponent);
 			this.gridComponent = null;
 		}
-		if (this.timeComponent) {
-			unmount(this.timeComponent);
-			this.timeComponent = null;
+		if (this.startTimeComponent) {
+			unmount(this.startTimeComponent);
+			this.startTimeComponent = null;
+		}
+		if (this.endTimeComponent) {
+			unmount(this.endTimeComponent);
+			this.endTimeComponent = null;
 		}
 		if (this.titleComponent) {
 			unmount(this.titleComponent);
 			this.titleComponent = null;
+		}
+		if (this.recentRecordsComponent) {
+			unmount(this.recentRecordsComponent);
+			this.recentRecordsComponent = null;
+		}
+		if (this.timeCardsComponent) {
+			unmount(this.timeCardsComponent);
+			this.timeCardsComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();
 	}
 
 	async save(projectId: number = -1): Promise<void> {
-		if (!this.selectedProject && projectId === -1) {
-			new Notice("Please select a project");
+		if (!this.startTime) {
+			new Notice("Please set a start time");
 			return;
 		}
 
@@ -248,22 +319,18 @@ export class CreateRecordModal extends Modal {
 			projectId = this.selectedProject.id;
 		}
 
-		if (this.plugin.settings.retroactiveTrackingEnabled) {
-			// Create a completed record
-			if (!this.endTime) {
-				new Notice("Please set an end time");
-				return;
-			}
 
-			if (this.endTime.getTime() < this.startTime.getTime()) {
+		if (this.plugin.settings.retroactiveTrackingEnabled) {
+			// check end time
+			if (this.endTime && this.endTime.getTime() < this.startTime.getTime()) {
 				new Notice("End time must be after start time");
 				return;
 			}
 
-			this.plugin.startTimer(projectId, this.titleInput.trim());
+			this.plugin.startTimer(projectId, this.titleInput.trim(), this.startTime, this.endTime ?? undefined);
 		} else {
 			// Start a new timer
-			this.plugin.startTimer(projectId, this.titleInput);
+			this.plugin.startTimer(projectId, this.titleInput, this.startTime, this.endTime ?? undefined);
 		}
 
 		this.onComplete();

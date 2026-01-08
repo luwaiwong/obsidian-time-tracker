@@ -1,15 +1,11 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { TimeRecord } from "../types";
-	import {
-		formatDuration,
-		formatNaturalDuration,
-		getRecordDuration,
-	} from "../utils/timeUtils";
+	import { formatNaturalDuration } from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { CreateRecordModal } from "../modals/CreateRecordModal";
 	import { EditRecordModal } from "../modals/EditRecordModal";
-	import { CSVHandler } from "../utils/csvHandler";
+	import RecentRecords from "./RecentRecords.svelte";
 	import "../../styles.css";
 
 	interface Props {
@@ -42,20 +38,11 @@
 	);
 	let currentRecord = $derived(
 		currentTimer
-			? plugin.timesheetData.records.find((r) => r.id === currentTimer.id)
+			? plugin.timesheetData.records.find((r) => r.id === currentTimer!.id)
 			: null,
 	);
 
-	let recentRecords = $derived(
-		plugin.timesheetData.records
-			.filter((r) => r.endTime !== null)
-			.sort((a, b) => b.endTime!.getTime() - a.endTime!.getTime())
-			.slice(0, plugin.settings.embeddedRecentRecordsCount || 3),
-	);
-
 	let timerDisplay = $derived(getTimerDisplay());
-
-	// display text for the main button
 	let buttonDisplayText = $derived(getButtonDisplayText());
 
 	// timer update effect
@@ -80,7 +67,7 @@
 			return projectName;
 		}
 		if (plugin.settings.retroactiveTrackingEnabled) {
-			return "Retroactively Track";
+			return "Track Retroactively";
 		}
 		return "Start tracking...";
 	}
@@ -100,9 +87,19 @@
 		return "00m 00s";
 	}
 
-	// starts record without project
 	function handlePlay(): void {
-		plugin.startTimerWithoutProject();
+		if (plugin.settings.retroactiveTrackingEnabled) {
+			new CreateRecordModal(
+				plugin.app,
+				plugin,
+				onRefresh,
+				false,
+				"",
+				null,
+			).open();
+		} else {
+			plugin.startTimerWithoutProject();
+		}
 	}
 
 	function handleStop(): void {
@@ -128,78 +125,6 @@
 				"",
 				null,
 			).open();
-		}
-	}
-
-	function handleRepeat(record: TimeRecord): void {
-		const project = plugin.getProjectById(record.projectId);
-
-		if (plugin.settings.retroactiveTrackingEnabled) {
-			// Retroactive behavior
-			const lastRecord = plugin.getLastStoppedRecord();
-			if (
-				lastRecord &&
-				lastRecord.projectId === record.projectId &&
-				lastRecord.title === record.title
-			) {
-				// Extend last record
-				const index = plugin.timesheetData.records.findIndex(
-					(r) => r.id === lastRecord.id,
-				);
-				if (index !== -1) {
-					plugin.timesheetData.records[index].endTime = new Date();
-					plugin.saveTimesheet();
-					plugin.refreshViews();
-				}
-			} else {
-				// Create completed record filling the gap
-				const now = new Date();
-				const startTime = lastRecord?.endTime || now;
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(plugin.timesheetData.records),
-					projectId: record.projectId,
-					startTime: startTime,
-					endTime: now,
-					title: record.title,
-				};
-				plugin.timesheetData.records.push(newRecord);
-				plugin.saveTimesheet();
-				plugin.refreshViews();
-			}
-		} else {
-			// Normal mode - start new timer
-			if (project) {
-				plugin.startTimer(project.id);
-				// Set the title after timer starts
-				setTimeout(() => {
-					const runningRecord = plugin.timesheetData.records.find(
-						(r) => r.projectId === project.id && r.endTime === null,
-					);
-					if (runningRecord) {
-						runningRecord.title = record.title;
-						plugin.saveTimesheet();
-						onRefresh();
-					}
-				}, 100);
-			} else {
-				// No project - start without project
-				plugin.startTimerWithoutProject(record.title);
-			}
-		}
-	}
-
-	function handleEdit(record: TimeRecord): void {
-		new EditRecordModal(plugin.app, plugin, record, onRefresh).open();
-	}
-
-	function handleDelete(record: TimeRecord): void {
-		const index = plugin.timesheetData.records.findIndex(
-			(r) => r.id === record.id,
-		);
-		if (index !== -1) {
-			plugin.timesheetData.records.splice(index, 1);
-			plugin.saveTimesheet();
-			plugin.refreshViews();
 		}
 	}
 </script>
@@ -272,82 +197,5 @@
 	</div>
 
 	<!-- LAST RECORDS SECTION -->
-	{#if recentRecords.length > 0}
-		<div class="pt-4 pb-3">
-			<div
-				class="text-[10px] text-(--text-faint) uppercase tracking-wider mb-1.5"
-			>
-				Last Records
-			</div>
-			<div class="flex flex-col gap-1">
-				{#each recentRecords as record (record.id)}
-					{@const project = plugin.getProjectById(record.projectId)}
-					<div class="flex items-center gap-2 rounded">
-						<!-- project name and title -->
-						<div
-							class="flex-1 min-w-0 flex items-center gap-1"
-							aria-label={(project
-								? `${project.name}`
-								: `No project`) +
-								(record.title
-									? ` - ${record.title}`
-									: " - untitled")}
-						>
-							{#if project}
-								<div
-									class="rounded flex items-center justify-center pr-2"
-									style="background-color: {project.color};"
-								>
-									<span
-										class="text-xs font-medium shrink-0 size-7 flex items-center justify-center"
-										>{project.icon}</span
-									>
-
-									<span class="text-xs font-medium shrink-0"
-										>{project.name}</span
-									>
-								</div>
-								{#if record.title}
-									<span
-										class="text-xs text-(--text-muted) truncate"
-										>{record.title}</span
-									>
-								{/if}
-							{:else}
-								<span
-									class="text-xs text-(--text-faint) italic shrink-0"
-									>No project</span
-								>
-								{#if record.title}
-									<span
-										class="text-xs text-(--text-normal) truncate"
-										>{record.title}</span
-									>
-								{/if}
-							{/if}
-						</div>
-
-						<div class="text-xs text-(--text-muted) tabular-nums">
-							{formatNaturalDuration(getRecordDuration(record))}
-						</div>
-						<!-- buttons -->
-						<button
-							class="size-10 rounded p-0"
-							aria-label="Repeat"
-							onclick={() => handleRepeat(record)}
-							{@attach icon("repeat")}
-						>
-						</button>
-						<button
-							class="size-10 rounded p-0"
-							aria-label="Edit"
-							onclick={() => handleEdit(record)}
-							{@attach icon("pencil")}
-						>
-						</button>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{/if}
+	<RecentRecords {plugin} {onRefresh} />
 </div>
