@@ -147,61 +147,6 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					),
 			);
 
-		// notifications section
-		containerEl.createEl("h3", { text: "Notifications" });
-
-		new Setting(containerEl)
-			.setName("Enable notifications")
-			.setDesc("Show notifications for timer events")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showNotifications)
-					.onChange(async (value) => {
-						this.plugin.settings.showNotifications = value;
-						await this.refreshAndSavePlugin();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Inactivity reminder")
-			.setDesc(
-				"Remind after this many seconds of inactivity (0 to disable)",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("3600")
-					.setValue(
-						String(this.plugin.settings.inactivityReminderDuration),
-					)
-					.onChange(async (value) => {
-						const num = parseInt(value);
-						if (!isNaN(num) && num >= 0) {
-							this.plugin.settings.inactivityReminderDuration =
-								num;
-							await this.refreshAndSavePlugin();
-						}
-					}),
-			);
-		new Setting(containerEl)
-			.setName("Activity reminder")
-			.setDesc(
-				"Remind to take a break after this many seconds of activity (0 to disable)",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("1800")
-					.setValue(
-						String(this.plugin.settings.activityReminderDuration),
-					)
-					.onChange(async (value) => {
-						const num = parseInt(value);
-						if (!isNaN(num) && num >= 0) {
-							this.plugin.settings.activityReminderDuration = num;
-							await this.refreshAndSavePlugin();
-						}
-					}),
-			);
-
 		// embedded tracker section
 		containerEl.createEl("h3", { text: "Embedded Tracker" });
 
@@ -221,10 +166,27 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// calendar integration section
+		containerEl.createEl("h3", { text: "Calendar Integration" });
+		new Setting(containerEl)
+			.setName("Add new calendar")
+			.setDesc("Add ICS calendar URLs to view them in the schedule view (e.g. https://calendar.google.com/calendar/ical/your@email.com/public/basic.ics)")
+			.addButton((button) =>
+				button
+					.setButtonText("Add Calendar")
+					.setCta()
+					.onClick(() => {
+						this.plugin.settings.icsCalendars.push("");
+						this.display();
+					}),
+			);
+		const calendarListContainer = containerEl.createDiv();
+		this.renderCalendarList(calendarListContainer);
+
 		// project management section
 		containerEl.createEl("h3", { text: "Project Management" });
 
-		// Mount the Svelte ProjectSettingsGrid component
+		// project settings component
 		const projectsGridDiv = containerEl.createDiv(
 			"time-tracker-projects-grid",
 		);
@@ -293,6 +255,27 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			(c) => c.id === categoryId,
 		);
 		return category ? category.name : "Uncategorized";
+	}
+
+	private renderCalendarList(containerEl: HTMLElement) {
+		containerEl.empty();
+
+		this.plugin.settings.icsCalendars.forEach((val, index) => {
+			new Setting(containerEl)
+				.addText((text) =>
+					text.setValue(val).onChange(async (newVal) => {
+						this.plugin.settings.icsCalendars[index] = newVal;
+						await this.plugin.saveSettings();
+					})
+				)
+				.addExtraButton((btn) =>
+					btn.setIcon("trash").onClick(async () => {
+						this.plugin.settings.icsCalendars.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.renderCalendarList(containerEl);
+					})
+				);
+		});
 	}
 
 	private displayCategories(containerEl: HTMLElement) {

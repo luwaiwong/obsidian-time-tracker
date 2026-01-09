@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { Project, TimeRecord } from "../types";
-	import { formatDuration } from "../utils/timeUtils";
+	import { formatNaturalDuration } from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
 	import timeGridPlugin from "@fullcalendar/timegrid";
 	import interactionPlugin from "@fullcalendar/interaction";
 	import { onMount, onDestroy } from "svelte";
+	import ICAL from "ical.js";
+	import { IcsEventModal } from "../modals/IcsEventModal";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -25,6 +27,14 @@
 	let interval: number | undefined;
 	let projects = $derived(plugin.timesheetData?.projects ?? []);
 	let records = $derived(plugin.timesheetData?.records ?? []);
+
+	let icsEvents = $state<any[]>([]);
+	let icsLoading = $state(false);
+
+	$effect(() => {
+		icsEvents = plugin.icsCache.events;
+		icsLoading = !plugin.icsCache.fetched && plugin.icsCache.loading;
+	});
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
@@ -125,40 +135,131 @@
 		return events;
 	}
 
-	function updateCalendarEvents() {
+	// yield to main thread to prevent UI blocking
+	function yieldToMain(): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, 0));
+	}
+
+	async function fetchIcsCalendars(force = false) {
+		if (plugin.icsCache.fetched && !force) {
+			return;
+		}
+		if (plugin.icsCache.loading) {
+			return;
+		}
+
+		plugin.icsCache.loading = true;
+		icsLoading = true;
+		const events: any[] = [];
+
+		for (const url of plugin.settings.icsCalendars) {
+			if (!url) continue;
+			try {
+				const text = await plugin.fetchUrl(url);
+
+				// yield before heavy parsing
+				await yieldToMain();
+
+				const jcalData = ICAL.parse(text);
+				const comp = new ICAL.Component(jcalData);
+				const vevents = comp.getAllSubcomponents("vevent");
+
+				// process in chunks to avoid blocking UI
+				// calendars can get large with >1000 events, processing all at once can cause lag
+				const CHUNK_SIZE = 10;
+				for (let i = 0; i < vevents.length; i += CHUNK_SIZE) {
+					const chunk = vevents.slice(i, i + CHUNK_SIZE);
+					for (const vevent of chunk) {
+						const event = new ICAL.Event(vevent);
+						const start = event.startDate?.toJSDate();
+						const end = event.endDate?.toJSDate();
+						if (!start) continue;
+
+						const icsColor = event.color || "ffffff";
+
+						events.push({
+							id: `ics-${event.uid}`,
+							title: event.summary || "Untitled",
+							start,
+							end: end || start,
+							backgroundColor: "var(--background-secondary)",
+							borderColor: icsColor,
+							borderWidth: "3px",
+							classNames: ["ics-event"],
+							extendedProps: {
+								isIcs: true,
+								description: event.description || "",
+								location: event.location || "",
+								url: vevent.getFirstPropertyValue("url") || "",
+								color: icsColor,
+							},
+						});
+					}
+					// yield between chunks
+					if (i + CHUNK_SIZE < vevents.length) {
+						await yieldToMain();
+					}
+				}
+			} catch (err) {
+				console.error("Failed to fetch ICS:", url, err);
+			}
+		}
+
+		plugin.icsCache.events = events;
+		plugin.icsCache.fetched = true;
+		plugin.icsCache.loading = false;
+		// update local state
+		icsEvents = events;
+		icsLoading = false;
+	}
+
+	function reloadIcsCalendars() {
+		fetchIcsCalendars(true);
+	}
+
+	async function updateCalendarEvents() {
 		if (!calendar) return;
-		const newEvents = buildCalendarEvents();
+		const trackerEvents = buildCalendarEvents();
+		const allEvents = [...trackerEvents, ...icsEvents];
 		const currentEvents = calendar.getEvents();
 
-		for (const newEvent of newEvents) {
-			const existing = currentEvents.find((e) => e.id === newEvent.id);
+		// more efficient lookups
+		const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
+		const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
+
+		// collect events to add
+		const eventsToAdd: any[] = [];
+		for (const newEvent of allEvents) {
+			const existing = currentEventsMap.get(newEvent.id);
 			if (existing) {
-				// update end time for running timers
 				if (newEvent.extendedProps?.isRunning) {
 					existing.setEnd(newEvent.end);
 				}
 			} else {
-				calendar.addEvent(newEvent);
+				eventsToAdd.push(newEvent);
+			}
+		}
+
+		// add events in chunks to avoid blocking UI
+		// calendars can get large with >1000 events, adding causes lag
+		const CHUNK_SIZE = 10;
+		for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
+			const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
+			for (const event of chunk) {
+				calendar.addEvent(event);
+			}
+			if (i + CHUNK_SIZE < eventsToAdd.length) {
+				await yieldToMain();
 			}
 		}
 
 		// remove events that no longer exist
 		for (const existing of currentEvents) {
-			if (!newEvents.find((e) => e.id === existing.id)) {
+			if (!allEventsMap.has(existing.id)) {
 				existing.remove();
 			}
 		}
 	}
-
-	let totalDayDuration = $derived.by(() => {
-		const events = buildCalendarEvents();
-		return events.reduce(
-			(total, event) => total + (event.extendedProps?.duration || 0),
-			0,
-		);
-	});
-
-	let blockCount = $derived(buildCalendarEvents().length);
 
 	let selectedDateLabel = $derived(
 		selectedDate.toLocaleDateString(undefined, {
@@ -204,48 +305,112 @@
 			},
 			eventMinHeight: 0,
 			eventShortHeight: 100000,
-			events: buildCalendarEvents(),
+			events: [...buildCalendarEvents(), ...icsEvents],
 			eventClick: (info) => {
-				if (
-					info.event.extendedProps?.project &&
-					info.event.extendedProps?.record
-				) {
-					onEditRecord(
-						info.event.extendedProps.record,
-						info.event.extendedProps.project,
-					);
+				const props = info.event.extendedProps;
+				if (props?.isIcs) {
+					new IcsEventModal(plugin.app, {
+						title: info.event.title,
+						start: info.event.start,
+						end: info.event.end,
+						description: props.description,
+						location: props.location,
+						url: props.url,
+						color: props.color,
+					}).open();
+				} else if (props?.project && props?.record) {
+					onEditRecord(props.record, props.project);
 				}
 			},
 			eventContent: (arg) => {
-				const duration = arg.event.extendedProps?.duration || 0;
-				const isRunning = arg.event.extendedProps?.isRunning || false;
+				const props = arg.event.extendedProps;
+				let duration = props?.duration || null;
 
-				// if duration under 30 min, just show color
-				if (duration < 30 * 60 * 1000) {
+				// calculate duration if not provided
+				if (duration == null) {
+					const start = arg.event.start;
+					const end = arg.event.end;
+					if (start && end) {
+						duration = end.getTime() - start.getTime();
+					} else {
+						duration = 0;
+					}
+				}
+
+				// ics events
+				if (props?.isIcs) {
+					if (duration != 0 && duration < 60 * 60 * 1000) {
+						return {
+							html: `
+								<div class="flex flex-row gap-1 justify-start items-center p-0 pl-1 w-full h-full overflow-hidden whitespace-nowrap"
+								style="flex-direction: row;">
+									<div class="font-bold text-sm shrink-0">${arg.event.title}:</div>
+									<div class="text-sm opacity-95 truncate">${arg.timeText}</div>
+								</div>
+							`,
+						};
+					}
+
 					return {
 						html: `
-							<div class="fc-event-main-container flex flex-col gap-0.5">
+							<div class="flex flex-column gap-0.5 justify-start items-start p-0 pl-1 w-full h-full"
+							style="flex-direction: column;">
+								<div class="font-bold text-sm">${arg.event.title} </div>
+								<div class="text-sm opacity-95">${arg.timeText}</div>
 							</div>
 						`,
 					};
-				} else {
+				} else; {
+					// time tracker events under 30 minutes
+					if (duration < 30 * 60 * 1000) {
+						return {
+							html: `<div class="flex flex-col gap-0.5"></div>`,
+						};
+					}
+
+					// time tracker events under 1.5 hours
+					if (duration < 90 * 60 * 1000) {
+						return {
+							html: `
+								<div class="flex flex-row gap-1 justify-start items-center p-0 w-full"
+								style="padding: 0;">
+									<div class="font-bold text-sm">${arg.event.title}: </div>
+									<div class="text-sm opacity-95">${formatNaturalDuration(duration)}</div>
+								</div>
+							`,
+						};
+					}
+					// time tracker events over 1.5 hours
 					return {
 						html: `
-							<div class="fc-event-main-container flex flex-col gap-0.5 justify-center">
-								<div class="font-bold text-sm">${arg.event.title}</div>
-								<div class="text-xs opacity-95">
-									${arg.timeText}
-								</div>
+							<div class="flex flex-column justify-start items-center p-0 w-full"
+							style="flex-direction: column; align-items: flex-start;">
+								<div class="font-bold text-sm">${arg.event.title} </div>
+								<div class="text-sm opacity-95">${formatNaturalDuration(duration)}</div>
+								<div class="text-sm opacity-95">${arg.timeText}</div>
 							</div>
 						`,
 					};
 				}
+
 			},
 		});
-
 		calendar.render();
 
-		// Watch for container resize to update calendar dimensions
+		// restore scroll position if available
+		if (plugin.scheduleState.scrollTop > 0) {
+			const scroller = calendarEl.querySelector(".fc-scroller-liquid-absolute");
+			if (scroller) {
+				scroller.scrollTop = plugin.scheduleState.scrollTop;
+			}
+		}
+
+		// fetch ICS if not already cached (events already included in initial render if cached)
+		if (!plugin.icsCache.fetched) {
+			fetchIcsCalendars();
+		}
+
+		// watch for container resize to update calendar dimensions
 		resizeObserver = new ResizeObserver(() => {
 			if (calendar) {
 				calendar.updateSize();
@@ -255,6 +420,12 @@
 	});
 
 	onDestroy(() => {
+		// save scroll position before destroy
+		const scroller = calendarEl?.querySelector(".fc-scroller-liquid-absolute");
+		if (scroller) {
+			plugin.scheduleState.scrollTop = scroller.scrollTop;
+		}
+
 		if (resizeObserver) {
 			resizeObserver.disconnect();
 		}
@@ -268,10 +439,11 @@
 
 	// Update events when data changes
 	$effect(() => {
-		// Watch for changes in projects, records, or selectedDate
+		// track dependencies
 		projects;
 		records;
 		selectedDate;
+		icsEvents;
 		updateCalendarEvents();
 	});
 </script>
@@ -290,6 +462,13 @@
 		>
 			{selectedDateLabel}
 		</button>
+		<button
+			class="p-2 rounded transition-colors shrink-0"
+			aria-label="Reload calendars"
+			onclick={reloadIcsCalendars}
+			disabled={icsLoading}
+			{@attach icon("refresh-cw")}
+		></button>
 		<button
 			class="p-2 rounded transition-colors shrink-0"
 			aria-label="Open Analytics"
@@ -357,8 +536,38 @@
 
 	:global(.fc .fc-event) {
 		border-radius: 6px;
-		padding: 4px 8px;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	/* ics calendar events */
+	:global(.fc .fc-event.ics-event) {
+		opacity: 0.9;
+		box-shadow: none;
+		padding: 0 !important;
+		overflow: hidden;
+	}
+
+	:global(.fc .fc-event.ics-event:hover) {
+		opacity: 1;
+	}
+
+	:global(.ics-event-content) {
+		display: flex;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	:global(.ics-color-bar) {
+		width: 4px;
+		flex-shrink: 0;
+	}
+
+	:global(.ics-event-info) {
+		display: flex;
+		flex-direction: column;
+		padding: 4px 8px;
+		overflow: hidden;
+		min-width: 0;
 	}
 
 	/* hide details only when FC marks it as short */

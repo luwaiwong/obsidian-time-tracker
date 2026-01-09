@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Plugin, TFile, WorkspaceLeaf, requestUrl } from "obsidian";
 import { TimeTrackerSettingTab } from "./src/settings";
 import {
 	TimeTrackerView,
@@ -29,12 +29,10 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	defaultTimeRange: "week",
 	customStartDate: Date.now(),
 	customEndDate: Date.now(),
-	showNotifications: true,
-	inactivityReminderDuration: 3600,
-	activityReminderDuration: 1800,
 	embeddedRecentRecordsCount: 5,
 	sortMode: "name",
 	categoryFilter: [],
+	icsCalendars: [],
 };
 
 export default class TimeTrackerPlugin extends Plugin {
@@ -49,6 +47,15 @@ export default class TimeTrackerPlugin extends Plugin {
 	private timesheetFile: TFile | null = null;
 	error: string | null = null;
 	isLoading: boolean = true;
+
+	// cache ics events, dont fetch every time schedule refreshed
+	icsCache: { events: any[]; fetched: boolean; loading: boolean } = {
+		events: [],
+		fetched: false,
+		loading: false,
+	};
+	// schedule view state (fix scroll position)
+	scheduleState: { scrollTop: number } = { scrollTop: 0 };
 
 	// ----- OBSIDIAN FUNCTIONS -----
 	async onload() {
@@ -309,7 +316,7 @@ export default class TimeTrackerPlugin extends Plugin {
 							(r) => r.id === lastRecord.id,
 						);
 						if (index !== -1) {
-							this.timesheetData.records[index].endTime = now;
+							this.timesheetData.records[index].endTime = endTime ?? now;
 						}
 					} 
 					// otherwise we create a new record
@@ -497,6 +504,11 @@ export default class TimeTrackerPlugin extends Plugin {
 			return undefined;
 		}
 		return this.timesheetData.projects.find((p) => p.id === id);
+	}
+
+	async fetchUrl(url: string): Promise<string> {
+		const response = await requestUrl({ url });
+		return response.text;
 	}
 
 	editProject(project: Project): void {
