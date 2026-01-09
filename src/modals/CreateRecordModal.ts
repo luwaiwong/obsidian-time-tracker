@@ -5,7 +5,7 @@ import ProjectSelector from "../components/ProjectSelector.svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import RecentRecords from "../components/RecentRecords.svelte";
-import TimeCards from "../components/TimeCards.svelte";
+import Cards from "../components/Cards.svelte";
 import { mount, unmount } from "svelte";
 
 export class CreateRecordModal extends Modal {
@@ -62,8 +62,8 @@ export class CreateRecordModal extends Modal {
 		modalEl.addClass("create-record-modal");
 
 		const modalTitle = this.plugin.settings.retroactiveTrackingEnabled
-			? "Track Retroactively"
-			: "Start Record";
+			? "Record Retroactively:"
+			: "Start Record:";
 
 		contentEl.createEl("h2", { text: modalTitle });
 
@@ -73,13 +73,6 @@ export class CreateRecordModal extends Modal {
 			return false;
 		});
 		
-
-
-		// time section
-		// contentEl.createEl("h3", { text: "Time" });
-		// const timeDivider = contentEl.createEl("hr");
-		// timeDivider.style.cssText =
-		// 	"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
 
 		// time info cards 
 		this.timeCardsContainer = contentEl.createDiv();
@@ -184,7 +177,7 @@ export class CreateRecordModal extends Modal {
 				selectedProjectId: this.selectedProject?.id || null,
 				selectionMode: true,
 				dropdownMode: true,
-				dropdownOpen: true,
+				dropdownOpen: this.selectedProject ? false : true,
 				onProjectClick: (project: Project) => {
 					this.selectedProject = project;
 					if (!this.titleInput) {
@@ -259,14 +252,20 @@ export class CreateRecordModal extends Modal {
 		}
 		this.timeCardsContainer.empty();
 
-		this.timeCardsComponent = mount(TimeCards, {
+		const cards: { label: string; value: number | Date; isDate?: boolean }[] = [];
+
+		if (this.lastRecord?.endTime) {
+			cards.push({ label: "Since Last", value: this.lastRecord.endTime, isDate: true });
+		}
+
+		if (this.plugin.settings.retroactiveTrackingEnabled && this.endTime) {
+			cards.push({ label: "Duration", value: this.endTime.getTime() - this.startTime.getTime() });
+			cards.push({ label: "Time Remaining", value: this.endTime, isDate: true });
+		}
+
+		this.timeCardsComponent = mount(Cards, {
 			target: this.timeCardsContainer,
-			props: {
-				lastRecordEndTime: this.lastRecord?.endTime || null,
-				startTime: this.startTime,
-				endTime: this.endTime,
-				isRetroactive: this.plugin.settings.retroactiveTrackingEnabled,
-			},
+			props: { cards },
 		});
 	}
 
