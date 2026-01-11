@@ -8,6 +8,7 @@
 	import { icon } from "../utils/styleUtils";
 	import { EditRecordModal } from "../modals/EditRecordModal";
 	import { CSVHandler } from "../utils/csvHandler";
+	import MiniTitle from "./MiniTitle.svelte";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -88,12 +89,10 @@
 
 {#if recentRecords.length > 0}
 	<div class="pt-4 pb-3">
-		<div
-			class="text-[10px] text-(--text-faint) uppercase tracking-wider mb-1.5"
-		>
-			Last Records
-		</div>
-		<div class="flex flex-col gap-1">
+		<MiniTitle>
+			{recentRecords.length == 1 ? "Last Record" : "Last Records"}
+		</MiniTitle>
+		<div class="flex flex-col gap-1 mt-1">
 			{#each recentRecords as record (record.id)}
 				{@const project = plugin.getProjectById(record.projectId)}
 				<div class="flex items-center gap-2 rounded">

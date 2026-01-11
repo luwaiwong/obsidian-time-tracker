@@ -462,13 +462,13 @@
 		>
 			{selectedDateLabel}
 		</button>
-		<button
+		<!-- <button
 			class="p-2 rounded transition-colors shrink-0"
 			aria-label="Reload calendars"
 			onclick={reloadIcsCalendars}
 			disabled={icsLoading}
 			{@attach icon("refresh-cw")}
-		></button>
+		></button> -->
 		<button
 			class="p-2 rounded transition-colors shrink-0"
 			aria-label="Open Analytics"

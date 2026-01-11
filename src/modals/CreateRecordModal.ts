@@ -6,7 +6,9 @@ import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import RecentRecords from "../components/RecentRecords.svelte";
 import Cards from "../components/Cards.svelte";
+import MiniTitle from "../components/MiniTitle.svelte";
 import { mount, unmount } from "svelte";
+import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
 
 export class CreateRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -22,8 +24,10 @@ export class CreateRecordModal extends Modal {
 	private startTimeComponent: Record<string, unknown> | null = null;
 	private endTimeComponent: Record<string, unknown> | null = null;
 	private titleComponent: Record<string, unknown> | null = null;
+	private titleLabelComponent: Record<string, unknown> | null = null;
 	private recentRecordsComponent: Record<string, unknown> | null = null;
 	private timeCardsComponent: Record<string, unknown> | null = null;
+	private projectLabelComponent: Record<string, unknown> | null = null;
 	private startTimeContainer: HTMLElement | null = null;
 	private endTimeContainer: HTMLElement | null = null;
 	private timeCardsContainer: HTMLElement | null = null;
@@ -61,36 +65,60 @@ export class CreateRecordModal extends Modal {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("create-record-modal");
 
-		const modalTitle = this.plugin.settings.retroactiveTrackingEnabled
-			? "Record Retroactively:"
-			: "Start Record:";
-
-		contentEl.createEl("h2", { text: modalTitle });
-
 		this.scope.register([], "Enter", (e) => {
 			e.preventDefault();
 			this.save();
 			return false;
 		});
 		
+		// const modalTitle = this.plugin.settings.retroactiveTrackingEnabled
+		// 	? "Create Record"
+		// 	: "Start Record";
+
+		// const title = contentEl.createEl("h2", { text: modalTitle });
+		// title.style.cssText = "text-align: center;";
+
 
 		// time info cards 
 		this.timeCardsContainer = contentEl.createDiv();
 		this.mountTimeCards();
 
-		// recent records section
-		const recentContainer = contentEl.createDiv();
-		this.recentRecordsComponent = mount(RecentRecords, {
-			target: recentContainer,
+		mountSpacer(contentEl, 16);
+
+		// title section
+		const titleSection = contentEl.createDiv("title-section");
+		const titleLabelContainer = titleSection.createDiv();
+		titleLabelContainer.style.margin = "0 0px 4px";
+		this.titleLabelComponent = mountMiniTitle(titleLabelContainer, "Title");
+		const titleContainer = titleSection.createDiv("title-input-container");
+		this.titleComponent = mount(TextInput, {
+			target: titleContainer,
 			props: {
-				plugin: this.plugin,
-				maxRecords: 3,
-				onRefresh: () => {
-					this.onComplete();
-					this.close();
+				value: this.titleInput,
+				placeholder: "What are you working on?",
+				style: "height: 40px; font-size: 1rem;",
+				onInput: (value: string) => {
+					this.titleInput = value;
 				},
 			},
 		});
+
+		const line = contentEl.createEl("div");
+		line.style.cssText = "margin: 0 0 8px 8px;";
+
+		// recent records section
+		// const recentContainer = contentEl.createDiv();
+		// this.recentRecordsComponent = mount(RecentRecords, {
+		// 	target: recentContainer,
+		// 	props: {
+		// 		plugin: this.plugin,
+		// 		maxRecords: 3,
+		// 		onRefresh: () => {
+		// 			this.onComplete();
+		// 			this.close();
+		// 		},
+		// 	},
+		// });
 
 
 		// time selectors
@@ -109,30 +137,14 @@ export class CreateRecordModal extends Modal {
 			this.endTimeComponent = this.mountEndTimeComponent(this.endTimeContainer);
 		}
 
-		// title section
-		contentEl.createEl("h3", { text: "Title" });
-		const titleDivider = contentEl.createEl("hr");
-		titleDivider.style.cssText =
-			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
-		const titleContainer = contentEl.createDiv("title-input-container");
-		this.titleComponent = mount(TextInput, {
-			target: titleContainer,
-			props: {
-				value: this.titleInput,
-				placeholder: "What are you working on?",
-				style: "height: 40px; font-size: 1rem;",
-				onInput: (value: string) => {
-					this.titleInput = value;
-				},
-			},
-		});
+		contentEl.createEl("div").style.cssText = "margin: 0 0 8px 8px;";
 		
 		// project section
-		const projectLabel = contentEl.createEl("h3", { text: "Project" });
-		const projectDivider = contentEl.createEl("hr");
-		projectDivider.style.cssText =
-			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
-		const gridContainer = contentEl.createDiv("project-grid-container");
+		const projectSection = contentEl.createDiv("project-section");
+		const projectLabelContainer = projectSection.createDiv();
+		projectLabelContainer.style.margin = "0 0px 4px";
+		this.projectLabelComponent = mountMiniTitle(projectLabelContainer, "Project");
+		const gridContainer = projectSection.createDiv("project-grid-container");
 
 		this.gridComponent = this.mountGridComponent(gridContainer);
 
@@ -296,9 +308,17 @@ export class CreateRecordModal extends Modal {
 			unmount(this.titleComponent);
 			this.titleComponent = null;
 		}
+		if (this.titleLabelComponent) {
+			unmount(this.titleLabelComponent);
+			this.titleLabelComponent = null;
+		}
 		if (this.recentRecordsComponent) {
 			unmount(this.recentRecordsComponent);
 			this.recentRecordsComponent = null;
+		}
+		if (this.projectLabelComponent) {
+			unmount(this.projectLabelComponent);
+			this.projectLabelComponent = null;
 		}
 		if (this.timeCardsComponent) {
 			unmount(this.timeCardsComponent);

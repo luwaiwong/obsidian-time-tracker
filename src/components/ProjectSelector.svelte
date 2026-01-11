@@ -151,7 +151,7 @@
 				flex: 1;
 				justify-content: space-between;
 				align-items:center;
-				{selectedProject ? `background-color: ${selectedProject.color};` : ''}
+				{selectedProject ? `background-color: ${selectedProject.color} !important;` : 'background-color: var(--background-primary-alt) !important;'}
 				cursor:pointer;
 				width: 100%;
 				height: 40px;
@@ -159,13 +159,13 @@
 			"
 			onclick={() => (dropdownOpen = !dropdownOpen)}
 		>
-			<span class="flex items-center gap-2">
+			<span class="flex items-center gap-2 pl-1">
 				{#if selectedProject}
 					<p class="text-[1rem]">{selectedProject.icon}</p>
 
 					<p class="text-[1rem]">{selectedProject.name}</p>
 				{:else}
-					Select a project
+					No Project Selected
 				{/if}
 			</span>
 			<span

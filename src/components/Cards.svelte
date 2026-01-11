@@ -40,7 +40,7 @@
 	<div class="flex gap-1">
 		{#each cards as card (card.label)}
 			<div
-				class="flex-1 py-1.5 px-2 rounded-lg bg-(--background-secondary) text-center"
+				class="flex-1 py-1.5 px-2 rounded-lg bg-(--background-primary-alt) text-center"
 			>
 				<div
 					class="text-[10px] text-(--text-faint) uppercase tracking-wider mb-1"

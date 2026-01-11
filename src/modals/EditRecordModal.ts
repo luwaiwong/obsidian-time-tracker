@@ -6,6 +6,8 @@ import { mount, unmount } from "svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import Cards from "../components/Cards.svelte";
+import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
+
 
 export class EditRecordModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -14,20 +16,26 @@ export class EditRecordModal extends Modal {
 
 	private titleInput: string;
 	private selectedProject: Project | null = null;
-	private startTimeInput: Date;
-	private endTimeInput: Date | null = null;
+	private startTime: Date;
+	private endTime: Date | null = null;
+
+	private projectLabelContainer: HTMLElement;
+	private projectLabelComponent: Record<string, unknown> | null = null;
 	private gridComponent: Record<string, unknown> | null = null;
+
+	private startTimeContainer: HTMLElement | null = null;
 	private startTimeComponent: Record<string, unknown> | null = null;
 	private endTimeComponent: Record<string, unknown> | null = null;
 	private titleComponent: Record<string, unknown> | null = null;
-	private cardsComponent: Record<string, unknown> | null = null;
+	private titleLabelComponent: Record<string, unknown> | null = null;
+	private timeCardsComponent: Record<string, unknown> | null = null;
 
-	private cardsContainer: HTMLElement;
+	private timeCardsContainer: HTMLElement;
 	private gridContainer: HTMLElement;
 	private timeContainer: HTMLElement;
-	private startTimeContainer: HTMLElement | null = null;
 	private endTimeContainer: HTMLElement | null = null;
 	private titleContainer: HTMLElement;
+	private titleLabelContainer: HTMLElement;
 
 	constructor(
 		app: App,
@@ -42,20 +50,37 @@ export class EditRecordModal extends Modal {
 
 		this.titleInput = record.title;
 		this.selectedProject = plugin.getProjectById(record.projectId) || null;
-		this.startTimeInput = record.startTime;
-		this.endTimeInput = record.endTime ? record.endTime : null;
+		this.startTime = record.startTime;
+		this.endTime = record.endTime ? record.endTime : null;
 	}
 
 	onOpen() {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("edit-record-modal");
 
-		contentEl.createEl("h2", { text: "Edit Record:" });
-
 		// time info cards 
-		this.cardsContainer = contentEl.createDiv();
-		this.cardsComponent = this.mountTimeCards(this.cardsContainer);
+		this.timeCardsContainer = contentEl.createDiv();
+		this.mountTimeCards();
 
+		mountSpacer(contentEl, 16);
+
+		// title
+		this.titleLabelContainer = contentEl.createDiv();
+		this.titleLabelContainer.style.margin = "0 16px 0px 0px";
+		this.titleLabelComponent = mountMiniTitle(this.titleLabelContainer, "Title");
+		this.titleContainer = contentEl.createDiv("title-input-container");
+		this.titleComponent = mount(TextInput, {
+			target: this.titleContainer,
+			props: {
+				value: this.titleInput,
+				placeholder: "What were you working on?",
+				style: "height: 40px; font-size: 1rem;",
+				onInput: (value: string) => {
+					this.titleInput = value;
+				},
+			},
+		});
+		
 		this.timeContainer = contentEl.createDiv("time-grid-container");
 		this.timeContainer.style.display = "flex";
 		this.timeContainer.style.flexDirection = "column";
@@ -72,37 +97,12 @@ export class EditRecordModal extends Modal {
 			this.endTimeComponent = this.mountEndTimeComponent(this.endTimeContainer);
 		}
 
-		// title
-		const titleLabel = contentEl.createEl("p", { text: "Title" });
-		titleLabel.style.cssText =
-			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
-
-		const titleDivider = contentEl.createEl("hr");
-		titleDivider.style.cssText =
-			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
-
-		this.titleContainer = contentEl.createDiv("title-input-container");
-		this.titleComponent = mount(TextInput, {
-			target: this.titleContainer,
-			props: {
-				value: this.titleInput,
-				placeholder: "Title",
-				style: "height: 40px; font-size: 1rem;",
-				onInput: (value: string) => {
-					this.titleInput = value;
-				},
-			},
-		});
+		mountSpacer(contentEl, 8);
 
 		// project selector
-		const projectLabel = contentEl.createEl("p", { text: "Project" });
-		projectLabel.style.cssText =
-			"font-size: 1.1rem; font-weight: 500; margin: 12px 0 4px 0;";
-
-		const projectDivider = contentEl.createEl("hr");
-		projectDivider.style.cssText =
-			"border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px 0;";
-
+		this.projectLabelContainer = contentEl.createDiv()
+		this.projectLabelContainer.style.margin = "0 16px 0px 0px";
+		this.projectLabelComponent = mountMiniTitle(this.projectLabelContainer, "Project");
 		this.gridContainer = contentEl.createDiv("project-grid-container");
 		this.gridComponent = this.mountGridComponent(this.gridContainer);
 
@@ -158,14 +158,6 @@ export class EditRecordModal extends Modal {
 		this.gridComponent = this.mountGridComponent(this.gridContainer);
 	}
 
-	private updateCards(container: HTMLElement): void {
-		if (this.cardsComponent) {
-			unmount(this.cardsComponent);
-		}
-		container.empty();
-		this.cardsComponent = this.mountTimeCards(this.cardsContainer);
-	}
-
 	onClose() {
 		if (this.gridComponent) {
 			unmount(this.gridComponent);
@@ -183,20 +175,36 @@ export class EditRecordModal extends Modal {
 			unmount(this.titleComponent);
 			this.titleComponent = null;
 		}
-		if (this.cardsComponent) {
-			unmount(this.cardsComponent);
-			this.cardsComponent = null;
+		if (this.timeCardsComponent) {
+			unmount(this.timeCardsComponent);
+			this.timeCardsComponent = null;
+		}
+		if (this.titleLabelComponent) {
+			unmount(this.titleLabelComponent);
+			this.titleLabelComponent = null;
+		}
+		if (this.projectLabelComponent) {
+			unmount(this.projectLabelComponent);
+			this.projectLabelComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();
 	}
 
-	private mountTimeCards(container: HTMLElement) {
-		return mount(Cards, {
-			target: container,
+	private mountTimeCards() {
+		if (!this.timeCardsContainer) return;
+
+		if (this.timeCardsComponent) {
+			unmount(this.timeCardsComponent);
+			this.timeCardsComponent = null;
+		}
+		this.timeCardsContainer.empty();
+
+		this.timeCardsComponent = mount(Cards, {
+			target: this.timeCardsContainer,
 			props: {
 				cards: [
-					{ label: "Duration", value: this.record.endTime ? this.record.endTime.getTime() - this.record.startTime.getTime() : 0, isDate: false },
+					{ label: "Duration", value: this.endTime ? this.endTime.getTime() - this.startTime.getTime() : 0, isDate: false },
 				],
 			},
 		});
@@ -206,23 +214,23 @@ export class EditRecordModal extends Modal {
 		return mount(TimeSelector, {
 			target: container,
 			props: {
-				value: this.startTimeInput,
+				value: this.startTime,
 				title: "Start Time",
+				maxDate: this.endTime ?? undefined,
 				customButton: {
-					label: "Now",
+					label: "Last",
 					onClick: () => {
-						this.startTimeInput = new Date();
-						if (this.startTimeComponent) {
-							unmount(this.startTimeComponent);
+						// get last record
+						const lastRecord = this.plugin.timesheetData.records.find(r => r.endTime !== null);
+						if (lastRecord) {
+							this.startTime = lastRecord.endTime!;
+							this.mountTimeCards();
 						}
-						container.empty();
-						this.startTimeComponent = this.mountStartTimeComponent(container);
-						this.updateCards(this.cardsContainer);
 					},
 				},
 				onChanged: (date: Date) => {
-					this.startTimeInput = date;
-					this.updateCards(this.cardsContainer);
+					this.startTime = date;
+					this.mountTimeCards();
 				},
 			},
 		});
@@ -232,23 +240,19 @@ export class EditRecordModal extends Modal {
 		return mount(TimeSelector, {
 			target: container,
 			props: {
-				value: this.endTimeInput || new Date(),
+				value: this.endTime || new Date(),
 				title: "End Time",
+				minDate: this.startTime,
 				customButton: {
 					label: "Now",
 					onClick: () => {
-						this.endTimeInput = new Date();
-						if (this.endTimeComponent) {
-							unmount(this.endTimeComponent);
-						}
-						container.empty();
-						this.endTimeComponent = this.mountEndTimeComponent(container);
-						this.updateCards(this.cardsContainer);
+						this.endTime = new Date();
+						this.mountTimeCards();
 					},
 				},
 				onChanged: (date: Date) => {
-					this.endTimeInput = date;
-					this.updateCards(this.cardsContainer);
+					this.endTime = date;
+					this.mountTimeCards();
 				},
 			},
 		});
@@ -278,8 +282,8 @@ export class EditRecordModal extends Modal {
 			return;
 		}
 
-		const newStart = this.startTimeInput;
-		const newEnd = this.endTimeInput ?? null;
+		const newStart = this.startTime;
+		const newEnd = this.endTime ?? null;
 
 		if (isNaN(newStart.getTime())) {
 			new Notice("Invalid start time");

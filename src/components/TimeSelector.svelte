@@ -1,4 +1,6 @@
 <script lang="ts">
+	import MiniTitle from "./MiniTitle.svelte";
+
 	interface Props {
 		value: Date;
 		title?: string;
@@ -59,44 +61,46 @@
 	}
 </script>
 
-<div
-	class="relative w-full h-fit bg-(--background-primary-alt) rounded-lg overflow-clip px-3 pt-1 pb-3 flex flex-col gap-2"
->
-	<p class="w-full text-center text-sm">{title}</p>
-	<input
-		class="w-full h-full rounded-md focus:outline-none focus:border-(--border-primary-focus)"
-		type="datetime-local"
-		value={timeInput}
-		min={minInput}
-		max={maxInput}
-		oninput={timeChanged}
-	/>
-	<div class="flex flex-row gap-1 w-full">
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(-30)}
-			>-30</button
-		>
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(-5)}
-			>-5</button
-		>
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(-1)}
-			>-1</button
-		>
-		{#if customButton}
-			<button
-				class="flex-1 py-1 rounded"
-				onclick={customButton.onClick}
+<div class="flex flex-col gap-1 w-full">
+	<MiniTitle>{title}</MiniTitle>
+	<div
+		class="relative w-full h-fit bg-(--background-primary-alt) rounded-lg overflow-clip px-3 py-3 flex flex-col gap-2"
+	>
+		<input
+			class="w-full h-full rounded-md focus:outline-none focus:border-(--border-primary-focus)"
+			type="datetime-local"
+			value={timeInput}
+			min={minInput}
+			max={maxInput}
+			oninput={timeChanged}
+		/>
+		<div class="flex flex-row gap-1 w-full">
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(-30)}
+				>-30</button
 			>
-				{customButton.label}
-			</button>
-		{/if}
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(1)}
-			>+1</button
-		>
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(5)}
-			>+5</button
-		>
-		<button class="flex-1 py-1 rounded" onclick={() => adjust(30)}
-			>+30</button
-		>
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(-5)}
+				>-5</button
+			>
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(-1)}
+				>-1</button
+			>
+			{#if customButton}
+				<button
+					class="flex-1 py-1 rounded"
+					onclick={customButton.onClick}
+				>
+					{customButton.label}
+				</button>
+			{/if}
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(1)}
+				>+1</button
+			>
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(5)}
+				>+5</button
+			>
+			<button class="flex-1 py-1 rounded" onclick={() => adjust(30)}
+				>+30</button
+			>
+		</div>
 	</div>
 </div>
