@@ -36,20 +36,12 @@
 	let icsEvents = $state<any[]>(plugin.icsCache.events);
 	let icsLoading = $state(false);
 	let zoomLevel = $state(plugin.settings.scheduleZoom);
+	let isUpdatingCalendar = false;
+	let pendingCalendarUpdate = false;
 
 	const ZOOM_LEVELS = [15, 30, 60, 120];
 
-	$effect(() => {
-		if (interval) clearInterval(interval);
-		interval = window.setInterval(() => {
-			now = Date.now();
-			updateCalendarEvents();
-		}, 1000 * 30);
-
-		return () => {
-			if (interval) clearInterval(interval);
-		};
-	});
+	// interval setup moved to onMount to prevent recreation on every render
 
 	async function refresh() {
 		await fetchIcsEvents(true);
@@ -231,13 +223,23 @@
 
 
 	async function fetchIcsEvents(force = false) {
-		if (plugin.icsCache.fetched && !force) {
+		console.log("fetching ICS events", force);
+		if (force) {
+			// reset stuck loading state and allow re-fetch
+			plugin.icsCache.fetched = false;
+			plugin.icsCache.loading = false;
+		}
+
+		if (plugin.icsCache.fetched) {
 			return;
 		}
+		if (plugin.icsCache.loading) {
+			return; // prevent concurrent fetches
+		}
+
 		icsLoading = true;
-
 		await fetchIcsCalendars(plugin);
-
+		console.log("finshed fetching ICS events", plugin.icsCache.events.length);
 		icsEvents = plugin.icsCache.events;
 		icsLoading = false;
 		await updateCalendarEvents();
@@ -248,45 +250,62 @@
 	}
 
 	async function updateCalendarEvents() {
+		console.log("updating calendar events");
 		if (!calendar) return;
-		const trackerEvents = buildCalendarEvents();
-		const allEvents = [...trackerEvents, ...icsEvents];
-		const currentEvents = calendar.getEvents();
+		if (isUpdatingCalendar) {
+			pendingCalendarUpdate = true;
+			return;
+		}
 
-		// more efficient lookups
-		const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
-		const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
+		isUpdatingCalendar = true;
+		pendingCalendarUpdate = false;
 
-		// collect events to add
-		const eventsToAdd: any[] = [];
-		for (const newEvent of allEvents) {
-			const existing = currentEventsMap.get(newEvent.id);
-			if (existing) {
-				if (newEvent.extendedProps?.isRunning) {
-					existing.setEnd(newEvent.end);
+		try {
+			const trackerEvents = buildCalendarEvents();
+			const allEvents = [...trackerEvents, ...icsEvents];
+			const currentEvents = calendar.getEvents();
+
+			// more efficient lookups
+			const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
+			const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
+
+			// collect events to add
+			const eventsToAdd: any[] = [];
+			for (const newEvent of allEvents) {
+				const existing = currentEventsMap.get(newEvent.id);
+				if (existing) {
+					if (newEvent.extendedProps?.isRunning) {
+						existing.setEnd(newEvent.end);
+					}
+				} else {
+					eventsToAdd.push(newEvent);
 				}
-			} else {
-				eventsToAdd.push(newEvent);
 			}
-		}
 
-		// add events in chunks to avoid blocking UI
-		// calendars can get large with >1000 events, adding causes lag
-		const CHUNK_SIZE = 10;
-		for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
-			const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
-			for (const event of chunk) {
-				calendar.addEvent(event);
+			// add events in chunks to avoid blocking UI
+			const CHUNK_SIZE = 10;
+			for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
+				const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
+				for (const event of chunk) {
+					calendar.addEvent(event);
+				}
+				if (i + CHUNK_SIZE < eventsToAdd.length) {
+					await yieldToMain();
+				}
 			}
-			if (i + CHUNK_SIZE < eventsToAdd.length) {
-				await yieldToMain();
-			}
-		}
 
-		// remove events that no longer exist
-		for (const existing of currentEvents) {
-			if (!allEventsMap.has(existing.id)) {
-				existing.remove();
+			// remove events that no longer exist
+			for (const existing of currentEvents) {
+				if (!allEventsMap.has(existing.id)) {
+					existing.remove();
+				}
+			}
+		} finally {
+			isUpdatingCalendar = false;
+			// if another update was requested while we were busy, run it now
+			if (pendingCalendarUpdate) {
+				pendingCalendarUpdate = false;
+				updateCalendarEvents();
 			}
 		}
 	}
@@ -296,8 +315,9 @@
 	function getCurrentScrollTime(): string {
 		const now = new Date();
 		const hours = now.getHours();
-		// scroll to current time, clamped to 23:00
-		const scrollHour = Math.max(0, hours - 4);
+		// scroll to current time, clamped to 23:00 + scroll offset
+
+		const scrollHour = Math.max(0, hours - 1);
 		return `${String(scrollHour).padStart(2, "0")}:00:00`;
 	}
 
@@ -375,14 +395,14 @@
 					onEditRecord(props.record, props.project);
 				}
 			},
-			eventDrop: (info) => {
+			eventDrop: async (info) => {
 				const props = info.event.extendedProps;
 				if (props?.isTimeblock && props?.timeblock) {
 					if (!plugin.settings.enableTimeblocking) {
 						info.revert();
 						return;
 					}
-					plugin.updateTimeblock(props.timeblock.id, {
+					await plugin.updateTimeblock(props.timeblock.id, {
 						startTime: info.event.start!,
 						endTime: info.event.end!,
 					});
@@ -390,14 +410,14 @@
 					info.revert();
 				}
 			},
-			eventResize: (info) => {
+			eventResize: async (info) => {
 				const props = info.event.extendedProps;
 				if (props?.isTimeblock && props?.timeblock) {
 					if (!plugin.settings.enableTimeblocking) {
 						info.revert();
 						return;
 					}
-					plugin.updateTimeblock(props.timeblock.id, {
+					await plugin.updateTimeblock(props.timeblock.id, {
 						startTime: info.event.start!,
 						endTime: info.event.end!,
 					});
@@ -456,11 +476,11 @@
 					const color = props.color || "#6b7280";
 					const notes = props.timeblock?.notes;
 
-					if (duration < compactThreshold) {
+					if (duration < minimizeThreshold) {
 						return {
 							html: `
-								<div class="timeblock-content" style="border-left: 3px solid ${color};">
-									<div class="font-bold text-sm truncate">${arg.event.title}</div>
+								<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
+									<div class="font-bold text-sm truncate mt-0">${arg.event.title}</div>
 								</div>
 							`,
 						};
@@ -469,13 +489,13 @@
 					let notesHtml = "";
 					if (notes) {
 						const formattedNotes = notes.replace(/\n/g, "<br>");
-						notesHtml = `<div class="text-xs opacity-70 mt-1 overflow-hidden">${formattedNotes}</div>`;
+						notesHtml = `<div class="text-xs opacity-70 mt-0 overflow-hidden">${formattedNotes}</div>`;
 					}
 
 					return {
 						html: `
-							<div class="timeblock-content" style="border-left: 3px solid ${color};">
-								<div class="font-bold text-sm">${arg.event.title}</div>
+							<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
+								<div class="font-bold text-sm mt-0">${arg.event.title}</div>
 								${notesHtml}
 							</div>
 						`,
@@ -527,8 +547,13 @@
 
 		// fetch ICS if not already cached (events already included in initial render if cached)
 		if (!plugin.icsCache.fetched) {
-			fetchIcsEvents();
+			fetchIcsEvents(true);
 		}
+
+		// update time every 30s for running timers (effect handles calendar update via `now` dependency)
+		interval = window.setInterval(() => {
+			now = Date.now();
+		}, 1000 * 30);
 
 		// watch for container resize to update calendar dimensions
 		resizeObserver = new ResizeObserver(() => {
@@ -565,6 +590,7 @@
 		timeblocks;
 		selectedDate;
 		icsEvents;
+		now;
 		plugin.settings.enableTimeblocking;
 		updateCalendarEvents();
 	});
@@ -572,38 +598,6 @@
 
 <div class="flex flex-col gap-3 h-full w-full p-3 box-border overflow-hidden">
 	<div class="flex justify-between items-center gap-1 w-full">
-		<div class="flex justify-start items-center gap-2">	
-			<button
-				class="shrink-0"
-				style="
-					background-color: transparent;
-					border: none;
-					padding: 0;
-					margin: 0;
-					cursor: pointer;
-
-				"
-				aria-label="Zoom out"
-				onclick={zoomOut}
-				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === ZOOM_LEVELS.length - 1}
-				{@attach icon("zoom-out")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				aria-label="Zoom in"
-				style="
-					background-color: transparent;
-					border: none;
-					padding: 0;
-					margin: 0;
-					cursor: pointer;
-
-				"
-				onclick={zoomIn}
-				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
-				{@attach icon("zoom-in")}
-			></button>
-		</div>
 		<div class=" flex justify-center items-center gap-2">
 			<button
 				class="border border-(--background-modifier-border) rounded-md px-2 py-1 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
@@ -625,12 +619,43 @@
 			</button>
 		</div>
 		<div class="flex justify-end items-center gap-2">	
+
 			<button
-				class="bg-transparent shrink-0"
+				class="shrink-0"
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 0;
+					padding: 4px;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				aria-label="Zoom out"
+				onclick={zoomOut}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === ZOOM_LEVELS.length - 1}
+				{@attach icon("zoom-out")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				aria-label="Zoom in"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 4px;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				onclick={zoomIn}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
+				{@attach icon("zoom-in")}
+			></button>
+			<button
+				class="bg-transparent shrink-0 {icsLoading ? 'ics-loading' : ''}"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 4px;
 					margin: 0;
 					cursor: pointer;
 
@@ -644,7 +669,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 0;
+					padding: 4px;
 					margin: 0;
 					cursor: pointer;
 
@@ -658,7 +683,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 0;
+					padding: 4px;
 					margin: 0;
 					cursor: pointer;
 
@@ -774,5 +799,18 @@
 		height: 100%;
 		overflow: hidden;
 		min-width: 0;
+	}
+
+	.ics-loading :global(svg) {
+		animation: rotate 1s linear infinite;
+	}
+
+	@keyframes rotate {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>
