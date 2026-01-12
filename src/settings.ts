@@ -65,29 +65,29 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		// display preferences section
 		containerEl.createEl("h3", { text: "Display Preferences" });
 
-		new Setting(containerEl)
-			.setName("Show seconds")
-			.setDesc("Display seconds in timer durations")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showSeconds)
-					.onChange(async (value) => {
-						this.plugin.settings.showSeconds = value;
-						await this.refreshAndSavePlugin();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("Show seconds")
+		// 	.setDesc("Display seconds in timer durations")
+		// 	.addToggle((toggle) =>
+		// 		toggle
+		// 			.setValue(this.plugin.settings.showSeconds)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.showSeconds = value;
+		// 				await this.refreshAndSavePlugin();
+		// 			}),
+		// 	);
 
-		new Setting(containerEl)
-			.setName("Show archived projects")
-			.setDesc("Display archived projects in the grid view")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showArchivedProjects)
-					.onChange(async (value) => {
-						this.plugin.settings.showArchivedProjects = value;
-						await this.refreshAndSavePlugin();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("Show archived projects")
+		// 	.setDesc("Display archived projects in the grid view")
+		// 	.addToggle((toggle) =>
+		// 		toggle
+		// 			.setValue(this.plugin.settings.showArchivedProjects)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.showArchivedProjects = value;
+		// 				await this.refreshAndSavePlugin();
+		// 			}),
+		// 	);
 
 		new Setting(containerEl)
 			.setName("Grid columns")
