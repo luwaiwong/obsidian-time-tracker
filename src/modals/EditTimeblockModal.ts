@@ -44,8 +44,8 @@ export class EditTimeblockModal extends Modal {
 
 		this.titleInput = timeblock.title;
 		this.notesInput = timeblock.notes || "";
-		this.startTime = timeblock.startTime;
-		this.endTime = timeblock.endTime;
+		this.startTime = new Date(timeblock.startTime);
+		this.endTime = new Date(timeblock.endTime);
 		this.customColor = timeblock.color;
 	}
 
@@ -211,22 +211,27 @@ export class EditTimeblockModal extends Modal {
 			return;
 		}
 
-		const updated: Timeblock = {
-			id: this.timeblock.id,
+		const notesValue = (this.notesInput ?? "").trim();
+		console.log("notesInput", notesValue);
+		const updated: Partial<Timeblock> = {
 			title: this.titleInput.trim(),
-			startTime: this.startTime,
-			endTime: this.endTime,
+			startTime: new Date(this.startTime),
+			endTime: new Date(this.endTime),
 			color: this.customColor,
-			notes: this.notesInput.trim(),
+			notes: notesValue,
 		};
 
-		this.plugin.updateTimeblock(this.timeblock.id, updated);
-		this.onUpdate(updated);
+		await this.plugin.updateTimeblock(this.timeblock.id, updated);
+		const fullUpdated: Timeblock = {
+			...this.timeblock,
+			...updated,
+		};
+		this.onUpdate(fullUpdated);
 		this.close();
 	}
 	async delete() {
 		const id = this.timeblock.id;
-		this.plugin.deleteTimeblock(id);
+		await this.plugin.deleteTimeblock(id);
 		new Notice("Timeblock deleted");
 		this.onDelete(id);
 		this.close();

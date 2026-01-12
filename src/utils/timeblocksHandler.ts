@@ -40,6 +40,33 @@ export class TimeblocksHandler {
 		return data;
 	}
 
+	private parseCSVLine(line: string): string[] {
+		const result: string[] = [];
+		let current = "";
+		let inQuotes = false;
+
+		for (let i = 0; i < line.length; i++) {
+			const char = line[i];
+
+			if (char === '"') {
+				if (inQuotes && line[i + 1] === '"') {
+					current += '"';
+					i++;
+				} else {
+					inQuotes = !inQuotes;
+				}
+			} else if (char === "," && !inQuotes) {
+				result.push(current);
+				current = "";
+			} else {
+				current += char;
+			}
+		}
+
+		result.push(current);
+		return result;
+	}
+
 	private parseTimeblock(parts: string[], data: TimeblocksData): void {
 		// format: timeblock,id,title,startTime,endTime,color,notes
 		if (parts.length < 6) return;
@@ -49,7 +76,7 @@ export class TimeblocksHandler {
 		const startTimeStr = parts[3];
 		const endTimeStr = parts[4];
 		const color = parts[5] || "#6b7280";
-		const notes = parts.length > 6 ? parts[6] : "";
+		const notes = this.unescapeNewlines(parts.length > 6 ? parts[6] : "");
 
 		const startTime = this.parseDateTime(startTimeStr);
 		const endTime = this.parseDateTime(endTimeStr);
@@ -92,39 +119,16 @@ export class TimeblocksHandler {
 		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 	}
 
-	private parseCSVLine(line: string): string[] {
-		const result: string[] = [];
-		let current = "";
-		let inQuotes = false;
+	private escapeNewlines(text: string): string {
+		return text.replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+	}
 
-		for (let i = 0; i < line.length; i++) {
-			const char = line[i];
-
-			if (char === '"') {
-				if (inQuotes && line[i + 1] === '"') {
-					current += '"';
-					i++;
-				} else {
-					inQuotes = !inQuotes;
-				}
-			} else if (char === "," && !inQuotes) {
-				result.push(current);
-				current = "";
-			} else {
-				current += char;
-			}
-		}
-
-		result.push(current);
-		return result;
+	private unescapeNewlines(text: string): string {
+		return text.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
 	}
 
 	private escapeCSVField(field: string): string {
-		if (
-			field.includes(",") ||
-			field.includes('"') ||
-			field.includes("\n")
-		) {
+		if (field.includes(",") || field.includes('"')) {
 			return `"${field.replace(/"/g, '""')}"`;
 		}
 		return field;
@@ -136,6 +140,7 @@ export class TimeblocksHandler {
 		for (const timeblock of data.timeblocks) {
 			const startTimeStr = this.formatDateTime(timeblock.startTime);
 			const endTimeStr = this.formatDateTime(timeblock.endTime);
+			const notes = this.escapeNewlines((timeblock.notes ?? "").toString());
 
 			lines.push(
 				[
@@ -145,7 +150,7 @@ export class TimeblocksHandler {
 					startTimeStr,
 					endTimeStr,
 					timeblock.color,
-					this.escapeCSVField(timeblock.notes || ""),
+					this.escapeCSVField(notes),
 				].join(","),
 			);
 		}

@@ -204,6 +204,9 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					.setCta()
 					.onClick(() => {
 						this.plugin.settings.icsCalendars.push("");
+						// invalidate cache so new calendar will be fetched
+						this.plugin.icsCache.fetched = false;
+						this.plugin.icsCache.events = [];
 						this.display();
 					}),
 			);
@@ -292,12 +295,18 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 				.addText((text) =>
 					text.setValue(val).onChange(async (newVal) => {
 						this.plugin.settings.icsCalendars[index] = newVal;
+						// invalidate cache so updated calendar will be fetched
+						this.plugin.icsCache.fetched = false;
+						this.plugin.icsCache.events = [];
 						await this.plugin.saveSettings();
 					})
 				)
 				.addExtraButton((btn) =>
 					btn.setIcon("trash").onClick(async () => {
 						this.plugin.settings.icsCalendars.splice(index, 1);
+						// invalidate cache so removed calendar is no longer shown
+						this.plugin.icsCache.fetched = false;
+						this.plugin.icsCache.events = [];
 						await this.plugin.saveSettings();
 						this.renderCalendarList(containerEl);
 					})

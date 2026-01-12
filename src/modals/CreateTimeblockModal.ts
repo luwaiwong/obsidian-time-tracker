@@ -194,12 +194,12 @@ export class CreateTimeblockModal extends Modal {
 			return;
 		}
 
-		const timeblock = this.plugin.createTimeblock({
+		const timeblock = await this.plugin.createTimeblock({
 			title: this.titleInput.trim(),
 			startTime: this.startTime,
 			endTime: this.endTime,
 			color: this.customColor,
-			notes: this.notesInput.trim(),
+			notes: (this.notesInput ?? "").trim(),
 		});
 
 		this.onCreate(timeblock);

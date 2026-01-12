@@ -303,17 +303,18 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	createTimeblock(timeblock: Omit<Timeblock, "id">): Timeblock {
+	async createTimeblock(timeblock: Omit<Timeblock, "id">): Promise<Timeblock> {
 		const newTimeblock: Timeblock = {
 			id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
 			...timeblock,
+			notes: (timeblock.notes ?? "").toString(),
 		};
 		this.timeblocksData.timeblocks.push(newTimeblock);
-		this.saveTimeblocks();
+		await this.saveTimeblocks();
 		return newTimeblock;
 	}
 
-	updateTimeblock(id: number, changes: Partial<Timeblock>): void {
+	async updateTimeblock(id: number, changes: Partial<Timeblock>): Promise<void> {
 		const index = this.timeblocksData.timeblocks.findIndex((t) => t.id === id);
 		if (index === -1) return;
 
@@ -321,14 +322,14 @@ export default class TimeTrackerPlugin extends Plugin {
 			...this.timeblocksData.timeblocks[index],
 			...changes,
 		};
-		this.saveTimeblocks();
+		await this.saveTimeblocks();
 	}
 
-	deleteTimeblock(id: number): void {
+	async deleteTimeblock(id: number): Promise<void> {
 		this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.filter(
 			(t) => t.id !== id,
 		);
-		this.saveTimeblocks();
+		await this.saveTimeblocks();
 	}
 
 	getTimeblockById(id: number): Timeblock | undefined {
