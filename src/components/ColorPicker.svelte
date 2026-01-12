@@ -6,11 +6,40 @@
 		onChange: (color: string) => void;
 	}
 
-	let { value, onChange }: Props = $props();
+	const HEX_COLOR_REGEX = /^#([0-9a-f]{6})$/i;
+
+let { value, onChange }: Props = $props();
+let textValue = $state("");
+
+	$effect(() => {
+		textValue = value;
+	});
+
+	const normalizeHex = (input: string): string | null => {
+		const trimmed = input.trim();
+		if (!trimmed) return null;
+		const prefixed = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+		return HEX_COLOR_REGEX.test(prefixed) ? prefixed.toLowerCase() : null;
+	};
+
+	const handleTextInput = (raw: string) => {
+		textValue = raw;
+		const normalized = normalizeHex(raw);
+		if (normalized) {
+			textValue = normalized;
+			if (normalized !== value) {
+				onChange(normalized);
+			}
+		}
+	};
+
+	const handleTextBlur = () => {
+		textValue = normalizeHex(textValue) ?? value;
+	};
 </script>
 
 <div class="flex flex-col gap-2">
-	<div class="grid grid-cols-8 gap-1.5">
+	<div class="grid grid-cols-5 gap-1.5">
 		{#each PRESET_COLORS as presetColor}
 			<button
 				type="button"
@@ -33,8 +62,16 @@
 			oninput={(e) => onChange(e.currentTarget.value)}
 			aria-label="Custom color picker"
 		/>
-		<span class="text-xs text-[--text-muted] font-mono shrink-0"
-			>{value}</span
-		>
+		<input
+			type="text"
+			class="text-xs border border-transparent outline-none cursor-text select-all w-18"
+			value={textValue}
+			oninput={(e) => handleTextInput(e.currentTarget.value)}
+			onclick={(e) => e.currentTarget.select()}
+			onblur={handleTextBlur}
+			autocomplete="off"
+			spellcheck={false}
+			aria-label="Color value"
+		/>
 	</div>
 </div>

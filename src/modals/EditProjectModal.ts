@@ -83,7 +83,7 @@ export class EditProjectModal extends Modal {
 		const iconContainer = contentEl.createDiv();
 		iconContainer.style.marginBottom = "16px";
 
-		const iconLabel = iconContainer.createEl("label", { text: "Icon" });
+		const iconLabel = iconContainer.createEl("label", { text: "Icon/Emoji" });
 		iconLabel.style.cssText =
 			"display: block; font-weight: 500; margin-bottom: 4px;";
 

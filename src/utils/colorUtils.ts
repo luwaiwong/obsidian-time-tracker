@@ -1,20 +1,20 @@
 export const PRESET_COLORS = sortColorsByHue([
-	"#FF6B6B", // Coral Red
-	"#E57373", // Light Red
-	"#FFB74D", // Orange
-	"#FFA07A", // Light Salmon
-	"#F8B88B", // Peach
-	"#F7DC6F", // Yellow
-	"#81C784", // Light Green
-	"#52B788", // Green
-	"#98D8C8", // Mint
-	"#4DB6AC", // Teal Light
-	"#4ECDC4", // Teal
-	"#45B7D1", // Sky Blue
-	"#85C1E2", // Light Blue
-	"#64B5F6", // Blue
-	"#9575CD", // Deep Purple
-	"#BB8FCE", // Purple
+	"#23272d", 
+	"#4c566a", 
+	"#5e81ac", 
+	"#81a1c1", 
+	"#88c0d0", 
+	// "#8fbcbb", 
+	"#a3be8c", 
+	"#ebcb8b", 
+	"#d08770", 
+	"#bf616a", 
+	"#b48ead", 
+	// "#45B7D1", 
+	// "#85C1E2", 
+	// "#64B5F6", 
+	// "#9575CD", 
+	// "#BB8FCE", 
 ]);
 
 export function getRandomPresetColor(): string {

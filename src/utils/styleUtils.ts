@@ -22,3 +22,8 @@ export function mountMiniTitle(container: HTMLElement, text: string) {
 export function mountSpacer(container: HTMLElement, size: number) {
 	container.createEl("div").style.cssText = `margin: 0 0 ${size}px 0;`;
 }
+
+// yield to main thread to prevent UI blocking
+export function yieldToMain(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}

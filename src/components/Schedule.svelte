@@ -2,13 +2,15 @@
 	import type TimeTrackerPlugin from "../../main";
 	import type { Project, TimeRecord } from "../types";
 	import { formatNaturalDuration } from "../utils/timeUtils";
-	import { icon } from "../utils/styleUtils";
+	import { icon, yieldToMain } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
 	import timeGridPlugin from "@fullcalendar/timegrid";
 	import interactionPlugin from "@fullcalendar/interaction";
 	import { onMount, onDestroy } from "svelte";
 	import ICAL from "ical.js";
 	import { IcsEventModal } from "../modals/IcsEventModal";
+	import { Notice } from "obsidian";
+	import { fetchIcsCalendars } from "../utils/icsHandler";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -135,86 +137,21 @@
 		return events;
 	}
 
-	// yield to main thread to prevent UI blocking
-	function yieldToMain(): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, 0));
-	}
 
-	async function fetchIcsCalendars(force = false) {
+	async function fetchIcsEvents(force = false) {
 		if (plugin.icsCache.fetched && !force) {
 			return;
 		}
-		if (plugin.icsCache.loading) {
-			return;
-		}
-
-		plugin.icsCache.loading = true;
 		icsLoading = true;
-		const events: any[] = [];
+		
+		await fetchIcsCalendars(plugin);
 
-		for (const url of plugin.settings.icsCalendars) {
-			if (!url) continue;
-			try {
-				const text = await plugin.fetchUrl(url);
-
-				// yield before heavy parsing
-				await yieldToMain();
-
-				const jcalData = ICAL.parse(text);
-				const comp = new ICAL.Component(jcalData);
-				const vevents = comp.getAllSubcomponents("vevent");
-
-				// process in chunks to avoid blocking UI
-				// calendars can get large with >1000 events, processing all at once can cause lag
-				const CHUNK_SIZE = 10;
-				for (let i = 0; i < vevents.length; i += CHUNK_SIZE) {
-					const chunk = vevents.slice(i, i + CHUNK_SIZE);
-					for (const vevent of chunk) {
-						const event = new ICAL.Event(vevent);
-						const start = event.startDate?.toJSDate();
-						const end = event.endDate?.toJSDate();
-						if (!start) continue;
-
-						const icsColor = event.color || "ffffff";
-
-						events.push({
-							id: `ics-${event.uid}`,
-							title: event.summary || "Untitled",
-							start,
-							end: end || start,
-							backgroundColor: "var(--background-secondary)",
-							borderColor: icsColor,
-							borderWidth: "3px",
-							classNames: ["ics-event"],
-							extendedProps: {
-								isIcs: true,
-								description: event.description || "",
-								location: event.location || "",
-								url: vevent.getFirstPropertyValue("url") || "",
-								color: icsColor,
-							},
-						});
-					}
-					// yield between chunks
-					if (i + CHUNK_SIZE < vevents.length) {
-						await yieldToMain();
-					}
-				}
-			} catch (err) {
-				console.error("Failed to fetch ICS:", url, err);
-			}
-		}
-
-		plugin.icsCache.events = events;
-		plugin.icsCache.fetched = true;
-		plugin.icsCache.loading = false;
-		// update local state
-		icsEvents = events;
+		icsEvents = plugin.icsCache.events;
 		icsLoading = false;
 	}
 
 	function reloadIcsCalendars() {
-		fetchIcsCalendars(true);
+		fetchIcsEvents(true);
 	}
 
 	async function updateCalendarEvents() {
@@ -303,9 +240,18 @@
 				minute: "2-digit",
 				hour12: false,
 			},
+			dayHeaderFormat: {
+				weekday: "long",
+				month: "long",
+				day: "numeric",
+				year: "numeric",
+			},
 			eventMinHeight: 0,
 			eventShortHeight: 100000,
 			events: [...buildCalendarEvents(), ...icsEvents],
+			dateClick(arg) {
+				console.log("Date clicked:", arg.date);
+			},
 			eventClick: (info) => {
 				const props = info.event.extendedProps;
 				if (props?.isIcs) {
@@ -407,7 +353,7 @@
 
 		// fetch ICS if not already cached (events already included in initial render if cached)
 		if (!plugin.icsCache.fetched) {
-			fetchIcsCalendars();
+			fetchIcsEvents();
 		}
 
 		// watch for container resize to update calendar dimensions
