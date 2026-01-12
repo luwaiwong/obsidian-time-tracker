@@ -452,14 +452,52 @@ export default class TimeTrackerPlugin extends Plugin {
 
 	/** find record by ID and extend its time */
 	repeatRecord(recordId: number, endTime: Date) {
-		const record = this.timesheetData.records.find(
-			(r) => r.id === recordId,
-		);
+		const record = this.timesheetData.records.find((r) => r.id === recordId);
 		if (!record) return;
 
-		record.endTime = endTime;
-		this.saveTimesheet();
-		this.refreshViews();
+		if (this.settings.retroactiveTrackingEnabled) {
+			const lastRecord = this.getLastStoppedRecord();
+			if (
+				lastRecord && lastRecord.projectId === record.projectId && lastRecord.title === record.title
+			) {
+				const index = this.timesheetData.records.findIndex(
+					(r) => r.id === lastRecord.id,
+				);
+				if (index !== -1) {
+					this.timesheetData.records[index].endTime = new Date();
+					this.saveTimesheet();
+					this.refreshViews();
+				}
+			} else {
+				const now = new Date();
+				const startTime = lastRecord?.endTime || now;
+				const newRecord: TimeRecord = {
+					id: CSVHandler.getNextId(this.timesheetData.records),
+					projectId: record.projectId,
+					startTime: startTime,
+					endTime: now,
+					title: record.title,
+				};
+				this.timesheetData.records.push(newRecord);
+				this.saveTimesheet();
+				this.refreshViews();
+			}
+		} else {
+			if (record.projectId) {
+				this.startTimer(record.projectId);
+				setTimeout(() => {
+					const runningRecord = this.timesheetData.records.find(
+						(r) => r.projectId === record.projectId && r.endTime === null,
+					);
+					if (runningRecord) {
+						runningRecord.title = record.title;
+						this.saveTimesheet();
+					}
+				}, 100);
+			} else {
+				this.startTimerWithoutProject(record.title);
+			}
+		}
 	}
 
 	/** stop a specific timer by record ID */

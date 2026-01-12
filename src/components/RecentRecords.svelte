@@ -30,56 +30,7 @@
 	);
 
 	function handleRepeat(record: TimeRecord): void {
-		const project = plugin.getProjectById(record.projectId);
-
-		if (plugin.settings.retroactiveTrackingEnabled) {
-			const lastRecord = plugin.getLastStoppedRecord();
-			if (
-				lastRecord &&
-				lastRecord.projectId === record.projectId &&
-				lastRecord.title === record.title
-			) {
-				const index = plugin.timesheetData.records.findIndex(
-					(r) => r.id === lastRecord.id,
-				);
-				if (index !== -1) {
-					plugin.timesheetData.records[index].endTime = new Date();
-					plugin.saveTimesheet();
-					plugin.refreshViews();
-				}
-			} else {
-				const now = new Date();
-				const startTime = lastRecord?.endTime || now;
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(plugin.timesheetData.records),
-					projectId: record.projectId,
-					startTime: startTime,
-					endTime: now,
-					title: record.title,
-				};
-				plugin.timesheetData.records.push(newRecord);
-				plugin.saveTimesheet();
-				plugin.refreshViews();
-			}
-			onRefresh();
-		} else {
-			if (project) {
-				plugin.startTimer(project.id);
-				setTimeout(() => {
-					const runningRecord = plugin.timesheetData.records.find(
-						(r) => r.projectId === project.id && r.endTime === null,
-					);
-					if (runningRecord) {
-						runningRecord.title = record.title;
-						plugin.saveTimesheet();
-					}
-					onRefresh();
-				}, 100);
-			} else {
-				plugin.startTimerWithoutProject(record.title);
-				onRefresh();
-			}
-		}
+		plugin.repeatRecord(record.id, new Date());
 	}
 
 	function handleEdit(record: TimeRecord): void {
