@@ -185,7 +185,7 @@
 
 		<!-- timer -->
 		<button
-			class="tabular-nums flex flex-1 items-center justify-center px-1 {isTracking
+			class="tabular-nums flex flex-1 items-center justify-center text-center px-1 {isTracking
 				? 'text-(--text-normal) bg-(--background-modifier-hover)'
 				: 'text-(--text-faint) border-2 border-(--background-modifier-hover) bg-transparent'}"
 			style="width: 5rem; height: 100%; border-radius: var(--radius-m); font-size: 1rem;"

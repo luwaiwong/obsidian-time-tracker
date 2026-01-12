@@ -30,12 +30,12 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	enableTimeblocking: true,
 	showSeconds: true,
 	showArchivedProjects: false,
-	gridColumns: 3,
-	defaultTimeRange: "week",
+	gridColumns: 5,
+	defaultTimeRange: "day",
 	customStartDate: Date.now(),
 	customEndDate: Date.now(),
-	embeddedRecentRecordsCount: 5,
-	sortMode: "name",
+	embeddedRecentRecordsCount: 3,
+	sortMode: "color",
 	categoryFilter: [],
 	icsCalendars: [],
 	scheduleZoom: 60,
@@ -129,8 +129,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
 
 		this.app.workspace.onLayoutReady(async () => {
-			await this.loadTimesheet();
-			await this.loadTimeblocks();
+			await this.loadPluginData();
 			await this.backupHandler.createBackup(this.settings.timesheetPath);
 			this.activateView();
 		});
@@ -146,18 +145,34 @@ export default class TimeTrackerPlugin extends Plugin {
 		// reload timesheet when app comes back to foreground for mobile
 		this.registerDomEvent(document, "visibilitychange", () => {
 			if (document.visibilityState === "visible") {
-				this.loadTimesheet();
+				this.loadPluginData();
 			}
 		});
 
 		// reload timesheet every 30 seconds
 		this.registerInterval(
-			window.setInterval(() => this.loadTimesheet(), 0.5 * 60 * 1000),
+			window.setInterval(() => {
+				this.loadPluginData();
+			}, 0.5 * 60 * 1000),
 		);
 	}
 
-	async onunload() {
+	async loadPluginData(){
+		try {
+			await this.loadTimesheet();
+			await this.loadTimeblocks();
+		} catch (err) {
+			console.error("Error loading plugin data:", err);
+		}
+	}
+
+	async savePluginData(){
 		await this.saveTimesheet();
+		await this.saveTimeblocks();
+	}
+
+	async onunload() {
+		await this.savePluginData();
 	}
 
 	// ----- LOADING DATA -----
