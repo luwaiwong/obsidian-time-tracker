@@ -500,9 +500,9 @@
 				</div>
 			{/if}
 
-			<div class="px-2 py-1 bg-(--background-secondary) rounded">
-				<strong>Total:</strong> {formatDuration(totalTime, false)}
-			</div>
+			<button class="px-2 py-1 bg-(--background-secondary) rounded">
+				Total: {formatDuration(totalTime, false)}
+			</button>
 		</div>
 
 		<!-- line -->

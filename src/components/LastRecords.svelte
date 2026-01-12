@@ -36,20 +36,27 @@
 	function handleEdit(record: TimeRecord): void {
 		new EditRecordModal(plugin.app, plugin, record, onRefresh).open();
 	}
-</script>
+</script>	
 
 {#if recentRecords.length > 0}
-	<div class="pt-4 pb-3">
-		<MiniTitle>
+	<div class="pt-1 pb-3">
+		<!-- <MiniTitle>
 			{recentRecords.length == 1 ? "Last Record" : "Last Records"}
-		</MiniTitle>
+		</MiniTitle> -->
 		<div class="flex flex-col gap-1 mt-1">
 			{#each recentRecords as record (record.id)}
 				{@const project = plugin.getProjectById(record.projectId)}
-				<div class="flex items-center gap-2 rounded">
+				<div
+					class="flex items-center gap-0 rounded-lg p-0 border-2"
+					style="border-color: {project?.color || ""};"
+				>
 					<!-- project name and title -->
 					<div
-						class="flex-1 min-w-0 flex items-center gap-1"
+						class="flex-1 min-w-0 flex items-center gap-1 cursor-pointer"
+						onclick={() => handleEdit(record)}
+						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
+						role="button"
+						tabindex="0"
 						aria-label={(project
 							? `${project.name}`
 							: `No project`) +
@@ -59,8 +66,7 @@
 					>
 						{#if project}
 							<div
-								class="rounded flex items-center justify-center pr-2"
-								style="background-color: {project.color};"
+								class="rounded flex items-center justify-center pr-1"
 							>
 								<span
 									class="text-xs font-medium shrink-0 size-7 flex items-center justify-center"
@@ -71,44 +77,48 @@
 									>{project.name}</span
 								>
 							</div>
-							{#if record.title}
-								<span
-									class="text-xs text-(--text-muted) truncate"
-									>{record.title}</span
-								>
-							{/if}
 						{:else}
 							<span
 								class="text-xs text-(--text-faint) italic shrink-0"
 								>No project</span
 							>
-							{#if record.title}
-								<span
-									class="text-xs text-(--text-normal) truncate"
-									>{record.title}</span
-								>
-							{/if}
+						{/if}
+
+						{#if record.title}
+							<span
+								class="text-xs text-(--text-muted) truncate mr-1"
+								>{record.title}</span
+							>
 						{/if}
 					</div>
 
-					<div class="text-xs text-(--text-muted) tabular-nums">
-						{formatNaturalDuration(getRecordDuration(record))}
+					<div class="text-xs text-(--text-normal) tabular-nums cursor-pointer pr-1"
+						onclick={() => handleEdit(record)}
+						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
+						role="button"
+						tabindex="0"
+					>
+						<!-- {formatNaturalDuration(getRecordDuration(record))} -->
+						 {record.startTime.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s?(am|pm)/i, "")}
+						 -
+						 {record.endTime?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s?(am|pm)/i, "")}
 					</div>
 					<!-- buttons -->
 					<button
 						class="size-10 rounded p-0"
+						style="cursor: pointer; margin: 4px"
 						aria-label="Repeat"
 						onclick={() => handleRepeat(record)}
 						{@attach icon("repeat")}
 					>
 					</button>
-					<button
+					<!-- <button
 						class="size-10 rounded p-0"
 						aria-label="Edit"
 						onclick={() => handleEdit(record)}
 						{@attach icon("pencil")}
 					>
-					</button>
+					</button> -->
 				</div>
 			{/each}
 		</div>

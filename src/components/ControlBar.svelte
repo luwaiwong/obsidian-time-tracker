@@ -5,7 +5,7 @@
 	import { icon } from "../utils/styleUtils";
 	import { CreateRecordModal } from "../modals/CreateRecordModal";
 	import { EditRecordModal } from "../modals/EditRecordModal";
-	import RecentRecords from "./RecentRecords.svelte";
+	import LastRecords from "./LastRecords.svelte";
 	import "../../styles.css";
 
 	interface Props {
@@ -138,8 +138,8 @@
 		<!-- play button -->
 		{#if isTracking}
 			<button
-				class="flex items-center justify-center transition-all"
-				style="width: 100%; height: 100%; border-radius: var(--radius-m);"
+				class="flex items-center justify-center"
+				style="width: 100%; height: 100%; border-radius: var(--radius-m); cursor: pointer;"
 				onclick={handleStop}
 				onmouseenter={() => (isPlayButtonHovering = true)}
 				onmouseleave={() => (isPlayButtonHovering = false)}
@@ -149,8 +149,8 @@
 			</button>
 		{:else}
 			<button
-				class="flex items-center justify-center bg-(--background-modifier-hover) hover:bg-(--background-modifier-hover) transition-colors border-2 border-(--background-modifier-hover)"
-				style="width: 100%; height: 100%; border-radius: var(--radius-m);"
+				class="flex items-center justify-center"
+				style="width: 100%; height: 100%; border-radius: var(--radius-m); cursor: pointer;"
 				onclick={handlePlay}
 				aria-label="Start tracking"
 				{@attach icon("play")}
@@ -197,5 +197,5 @@
 	</div>
 
 	<!-- LAST RECORDS SECTION -->
-	<RecentRecords {plugin} {onRefresh} />
+	<LastRecords {plugin} {onRefresh} />
 </div>

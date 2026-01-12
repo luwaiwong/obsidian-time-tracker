@@ -93,7 +93,7 @@ export class TimeTrackerView extends ItemView {
 					// @ts-ignore
 					this.plugin.app.setting.openTabById("time-tracker");
 				},
-				onEditRecord: (record: TimeRecord, project: Project) => {
+				onEditRecord: (record: TimeRecord) => {
 					new EditRecordModal(
 						this.plugin.app,
 						this.plugin,

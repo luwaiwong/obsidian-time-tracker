@@ -4,6 +4,7 @@
 	interface Props {
 		children?: Snippet;
 		text?: string;
+
 	}
 
 	let { children, text = "" }: Props = $props();

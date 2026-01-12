@@ -4,6 +4,7 @@
 	import type TimeTrackerPlugin from "../../main";
 	import { slide } from "svelte/transition";
 	import { compareColors } from "..//utils/colorUtils";
+  	import { icon } from "../utils/styleUtils";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -163,8 +164,9 @@
 			</span>
 			<span
 				class="text-[1rem] text-(--text-muted) transition-transform duration-200"
-				class:rotate-180={dropdownOpen}>▼</span
-			>
+				class:rotate-180={dropdownOpen}
+				{@attach icon("chevron-down")}
+			></span>
 		</button>
 
 		{#if dropdownOpen}

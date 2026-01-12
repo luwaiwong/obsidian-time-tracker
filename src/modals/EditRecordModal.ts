@@ -72,7 +72,7 @@ export class EditRecordModal extends Modal {
 
 		// title
 		this.titleLabelContainer = contentEl.createDiv();
-		this.titleLabelContainer.style.margin = "0 16px 0px 0px";
+		this.titleLabelContainer.style.margin = "0 16px 4px 0px";
 		this.titleLabelComponent = mountMiniTitle(this.titleLabelContainer, "Title");
 		this.titleContainer = contentEl.createDiv("title-input-container");
 		this.titleComponent = mount(TextInput, {
@@ -107,7 +107,7 @@ export class EditRecordModal extends Modal {
 
 		// project selector
 		this.projectLabelContainer = contentEl.createDiv()
-		this.projectLabelContainer.style.margin = "0 16px 0px 0px";
+		this.projectLabelContainer.style.margin = "0 16px 4px 0px";
 		this.projectLabelComponent = mountMiniTitle(this.projectLabelContainer, "Project");
 		this.gridContainer = contentEl.createDiv("project-grid-container");
 		this.gridComponent = this.mountGridComponent(this.gridContainer);

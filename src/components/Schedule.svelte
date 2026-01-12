@@ -605,34 +605,37 @@
 
 <div class="flex flex-col gap-3 h-full w-full p-3 box-border overflow-hidden">
 	<div class="flex justify-between items-center gap-1 w-full">
-		<div class=" flex justify-center items-center gap-2">
-			<button
-				class="border border-(--background-modifier-border) rounded-md px-2 py-1 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
-				onclick={() => moveDay(-1)}
-			>
-				‹
-			</button>
+		<div class=" flex justify-center items-center gap-1">
 			<button
 				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 4px"
+				onclick={() => moveDay(-1)}
+				aria-label="Previous day"
+				{@attach icon("chevron-left")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 6px"
 				onclick={setToday}
 				aria-label="Go to today"
 				{@attach icon("calendar-check")}
 			></button>
 			<button
-				class="border border-(--background-modifier-border) rounded-md px-2 py-1 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
+				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 4px"
 				onclick={() => moveDay(1)}
-			>
-				›
-			</button>
+				aria-label="Next day"
+				{@attach icon("chevron-right")}
+			></button>
 		</div>
-		<div class="flex justify-end items-center gap-2">	
+		<div class="flex justify-end items-center gap-1">	
 
 			<button
 				class="shrink-0"
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 4px;
+					padding: 6px;
 					margin: 0;
 					cursor: pointer;
 
@@ -648,7 +651,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 4px;
+					padding: 6px;
 					margin: 0;
 					cursor: pointer;
 
@@ -662,7 +665,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 4px;
+					padding: 6px;
 					margin: 0;
 					cursor: pointer;
 
@@ -676,7 +679,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 4px;
+					padding: 6px;
 					margin: 0;
 					cursor: pointer;
 
@@ -690,7 +693,7 @@
 				style="
 					background-color: transparent;
 					border: none;
-					padding: 4px;
+					padding: 6px;
 					margin: 0;
 					cursor: pointer;
 
