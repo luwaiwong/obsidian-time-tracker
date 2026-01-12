@@ -51,15 +51,8 @@
 	function handleProjectClick(project: Project) {
 		if (onProjectClick) {
 			onProjectClick(project);
-		} else {
-			const isRunning = isProjectRunning(project.id);
-			if (isRunning) {
-				plugin.stopTimer(project.id);
-			} else {
-				plugin.startTimer(project.id);
-			}
-		}
-
+		} 
+		
 		if (dropdownMode) {
 			dropdownOpen = false;
 		}

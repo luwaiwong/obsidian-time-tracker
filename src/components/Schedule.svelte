@@ -32,6 +32,9 @@
 
 	let icsEvents = $state<any[]>([]);
 	let icsLoading = $state(false);
+	let zoomLevel = $state(plugin.settings.scheduleZoom);
+
+	const ZOOM_LEVELS = [15, 30, 60, 120];
 
 	$effect(() => {
 		icsEvents = plugin.icsCache.events;
@@ -64,6 +67,32 @@
 		if (calendar) {
 			calendar.gotoDate(selectedDate);
 		}
+	}
+
+	function zoomIn() {
+		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+		if (idx > 0) {
+			zoomLevel = ZOOM_LEVELS[idx - 1];
+			applyZoom();
+		}
+	}
+
+	function zoomOut() {
+		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+		if (idx < ZOOM_LEVELS.length - 1) {
+			zoomLevel = ZOOM_LEVELS[idx + 1];
+			applyZoom();
+		}
+	}
+
+	function applyZoom() {
+		if (calendar) {
+			const duration = `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`;
+			calendar.setOption("slotDuration", duration);
+			calendar.setOption("slotLabelInterval", duration);
+		}
+		plugin.settings.scheduleZoom = zoomLevel;
+		plugin.saveSettings();
 	}
 
 	function getDayRange(date: Date) {
@@ -198,14 +227,6 @@
 		}
 	}
 
-	let selectedDateLabel = $derived(
-		selectedDate.toLocaleDateString(undefined, {
-			weekday: "long",
-			month: "short",
-			day: "numeric",
-		}),
-	);
-
 	let resizeObserver: ResizeObserver | null = null;
 
 	function getCurrentScrollTime(): string {
@@ -225,8 +246,8 @@
 			height: "100%",
 			slotMinTime: "00:00:00",
 			slotMaxTime: "24:00:00",
-			slotDuration: "01:00:00",
-			slotLabelInterval: "01:00:00",
+			slotDuration: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+			slotLabelInterval: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
 			allDaySlot: false,
 			nowIndicator: true,
 			scrollTime: getCurrentScrollTime(),
@@ -394,45 +415,90 @@
 	});
 </script>
 
-<div class="flex flex-col gap-3 h-full p-3 box-border overflow-hidden">
-	<div class="flex items-center gap-2 shrink-0 w-full">
+<div class="flex flex-col gap-3 h-full w-full p-3 box-border overflow-hidden">
+	<div class="flex justify-between items-center gap-1 w-full">
+		<div class="flex justify-start items-center gap-2">	
+			<button
+				class="shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				aria-label="Zoom out"
+				onclick={zoomOut}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === ZOOM_LEVELS.length - 1}
+				{@attach icon("zoom-out")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				aria-label="Zoom in"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				onclick={zoomIn}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
+				{@attach icon("zoom-in")}
+			></button>
+		</div>
+		<div class=" flex justify-center items-center gap-2">
+			<button
+				class="border border-(--background-modifier-border) rounded-md px-2 py-1 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
+				onclick={() => moveDay(-1)}
+			>
+				‹
+			</button>
+			<button
+				class="bg-transparent shrink-0"
+				onclick={setToday}
+				aria-label="Go to today"
+				{@attach icon("calendar-check")}
+			></button>
+			<button
+				class="border border-(--background-modifier-border) rounded-md px-2 py-1 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
+				onclick={() => moveDay(1)}
+			>
+				›
+			</button>
+		</div>
+		<div class="flex justify-end items-center gap-2">	
+			<button
+				class="bg-transparent shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				aria-label="Open Analytics"
+				onclick={onOpenAnalytics}
+				{@attach icon("bar-chart-2")}
+			></button>
 		<button
-			class="border border-(--background-modifier-border) rounded-md px-2.5 py-1.5 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
-			onclick={() => moveDay(-1)}
-		>
-			‹
-		</button>
-		<button
-			class="flex-1 border border-(--interactive-accent) rounded-md px-2.5 py-1.5 bg-(--interactive-accent) text-(--text-on-accent) cursor-pointer font-semibold hover:brightness-105"
-			onclick={setToday}
-		>
-			{selectedDateLabel}
-		</button>
-		<!-- <button
-			class="p-2 rounded transition-colors shrink-0"
-			aria-label="Reload calendars"
-			onclick={reloadIcsCalendars}
-			disabled={icsLoading}
-			{@attach icon("refresh-cw")}
-		></button> -->
-		<button
-			class="p-2 rounded transition-colors shrink-0"
-			aria-label="Open Analytics"
-			onclick={onOpenAnalytics}
-			{@attach icon("bar-chart-2")}
-		></button>
-		<button
-			class="p-2 rounded transition-colors shrink-0"
+			class="bg-transparent shrink-0"
+			style="
+				background-color: transparent;
+				border: none;
+				padding: 0;
+				margin: 0;
+				cursor: pointer;
+
+			"
 			aria-label="Open Settings"
 			onclick={onOpenSettings}
 			{@attach icon("settings")}
 		></button>
-		<button
-			class="border border-(--background-modifier-border) rounded-md px-2.5 py-1.5 bg-transparent text-(--text-normal) cursor-pointer font-semibold hover:brightness-105"
-			onclick={() => moveDay(1)}
-		>
-			›
-		</button>
+		</div>
 	</div>
 
 	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>

@@ -62,7 +62,7 @@
 			const projectName = currentProject?.name || "No project";
 			const title = currentRecord.title;
 			if (title) {
-				return `${projectName} · ${title}`;
+				return `${title}`;
 			}
 			return projectName;
 		}
@@ -103,9 +103,9 @@
 	}
 
 	function handleStop(): void {
-		if (currentTimer) {
-			plugin.stopTimer(currentTimer.projectId);
-		}
+	if (currentTimer) {
+			plugin.stopTimer(currentTimer.id);
+	}
 	}
 
 	function handleMainButtonClick(): void {
@@ -159,17 +159,17 @@
 
 		<!-- project area -->
 		<div
-			class="px-4 py-3 rounded-lg text-left transition-colors hover:bg-(--background-modifier-hover) cursor-pointer"
-			style="border-color: {isTracking && currentProject
-				? currentProject.color + '; border: 3px solid; padding: 0.8rem;'
-				: 'var(--background-modifier-hover); border: 2px solid var(--background-modifier-hover)'}"
+			class="px-4 py-3 rounded-lg text-left transition-colors hover:bg-(--background-modifier-hover) cursor-pointer overflow-hidden"
+			style="border: {isTracking && currentProject
+				? `3px solid ${currentProject.color}`
+				: '2px solid var(--background-modifier-hover)'};"
 			onclick={handleMainButtonClick}
 			onkeydown={(e) => e.key === "Enter" && handleMainButtonClick()}
 			role="button"
 			tabindex="0"
 			aria-label={isTracking ? "Edit current record" : "Start tracking"}
 		>
-			<div class="flex items-center gap-2 min-w-0">
+			<div class="flex items-center gap-2 min-w-0 w-full">
 				{#if isTracking && currentProject}
 					<span class="text-lg shrink-0">{currentProject.icon}</span>
 				{/if}
@@ -185,7 +185,7 @@
 
 		<!-- timer -->
 		<button
-			class="tabular-nums flex items-center justify-center px-1 {isTracking
+			class="tabular-nums flex flex-1 items-center justify-center px-1 {isTracking
 				? 'text-(--text-normal) bg-(--background-modifier-hover)'
 				: 'text-(--text-faint) border-2 border-(--background-modifier-hover) bg-transparent'}"
 			style="width: 5rem; height: 100%; border-radius: var(--radius-m); font-size: 1rem;"

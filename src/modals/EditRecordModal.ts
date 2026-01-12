@@ -59,6 +59,12 @@ export class EditRecordModal extends Modal {
 		modalEl.addClass("edit-record-modal");
 
 		// time info cards 
+		this.scope.register([], "Enter", (e) => {
+			e.preventDefault();
+			this.save();
+			return false;
+		});
+		
 		this.timeCardsContainer = contentEl.createDiv();
 		this.mountTimeCards();
 

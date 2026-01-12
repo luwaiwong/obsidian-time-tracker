@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	sortMode: "name",
 	categoryFilter: [],
 	icsCalendars: [],
+	scheduleZoom: 60,
 };
 
 export default class TimeTrackerPlugin extends Plugin {
@@ -285,7 +286,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.timesheetData.records.push(newRecord);
 
 		this.saveTimesheet();
-		// this.refreshViews();
+		this.refreshViews();
 	}
 
 	/** start tracking time for a project */
@@ -343,7 +344,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			);
 
 			if (existingTimer) {
-				this.stopTimer(projectId);
+				this.stopTimer(existingTimer.id);
 			} else {
 				// create a new record with null endTime (running timer)
 				const newRecord: TimeRecord = {
@@ -358,7 +359,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 
 		this.saveTimesheet();
-		// this.refreshViews();
+		this.refreshViews();
 	}
 
 	/** find record by ID and extend its time */
@@ -373,30 +374,18 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.refreshViews();
 	}
 
-	/** stop a specific timer */
-	stopTimer(projectId: number) {
-		let recordIndex: number;
-
-		if (projectId === -1) {
-			// Stop timer without project (empty projectName)
-			recordIndex = this.timesheetData.records.findIndex(
-				(r) => r.projectId === -1 && r.endTime === null,
-			);
-		} else {
-			const project = this.getProjectById(projectId);
-			if (!project) return;
-
-			recordIndex = this.timesheetData.records.findIndex(
-				(r) => r.projectId === project.id && r.endTime === null,
-			);
-		}
+	/** stop a specific timer by record ID */
+	stopTimer(recordId: number) {
+		const recordIndex = this.timesheetData.records.findIndex(
+			(r) => r.id === recordId && r.endTime === null,
+		);
 
 		if (recordIndex === -1) return;
 
 		this.timesheetData.records[recordIndex].endTime = new Date();
 
 		this.saveTimesheet();
-		// this.refreshViews();
+		this.refreshViews();
 	}
 
 	/*
@@ -460,7 +449,12 @@ export default class TimeTrackerPlugin extends Plugin {
 			(t) => t.projectId === project.id,
 		);
 		if (isRunning) {
-			this.stopTimer(project.id);
+			const runningRecord = this.runningTimers.find(
+				(r) => r.projectId === project.id,
+			);
+			if (runningRecord) {
+				this.stopTimer(runningRecord.id);
+			}
 		} else {
 			this.startTimer(project.id);
 		}

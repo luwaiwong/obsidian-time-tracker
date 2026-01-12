@@ -83,7 +83,12 @@
 		const isRunning = plugin.isProjectRunning(project.id);
 
 		if (isRunning) {
-			plugin.stopTimer(project.id);
+		const runningRecord = plugin.runningTimers.find(
+			(t) => t.projectId === project.id,
+		);
+		if (runningRecord) {
+			plugin.stopTimer(runningRecord.id);
+		}
 		} else {
 			plugin.startTimer(project.id);
 		}
@@ -114,7 +119,7 @@
 	{#if config.showRunningTimer && runningTimers.length > 0}
 		<div class="running-timers">
 			<h4>Running Timers</h4>
-			{#each runningTimers as timer (timer.projectId)}
+			{#each runningTimers as timer (timer.id)}
 				{#if getProject(timer.projectId)}
 					<div
 						class="running-timer"

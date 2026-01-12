@@ -51,6 +51,7 @@ export interface PluginSettings {
 	sortMode: "category" | "name" | "color" | "recent";
 	categoryFilter: number[];
 	icsCalendars: string[];
+	scheduleZoom: number;
 }
 
 export interface TimesheetData {
