@@ -7,11 +7,14 @@ import {
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
 import { CSVHandler } from "./src/utils/csvHandler";
 import { BackupHandler } from "./src/utils/backupHandler";
+import { TimeblocksHandler } from "./src/utils/timeblocksHandler";
 import type {
 	PluginSettings,
 	TimesheetData,
+	TimeblocksData,
 	TimeRecord,
 	Project,
+	Timeblock,
 } from "./src/types";
 import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
 import { ImportModal } from "./src/modals/ImportSTTModal";
@@ -20,9 +23,11 @@ import { BackupViewerModal } from "./src/modals/BackupViewerModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
+	timeblocksPath: "timeblocks.csv",
 	settingsPath: "time-tracker-settings.json",
 
 	retroactiveTrackingEnabled: false,
+	enableTimeblocking: true,
 	showSeconds: true,
 	showArchivedProjects: false,
 	gridColumns: 3,
@@ -43,9 +48,14 @@ export default class TimeTrackerPlugin extends Plugin {
 		projects: [],
 		categories: [],
 	};
+	timeblocksData: TimeblocksData = {
+		timeblocks: [],
+	};
 	csvHandler: CSVHandler;
 	backupHandler: BackupHandler;
+	timeblocksHandler: TimeblocksHandler;
 	private timesheetFile: TFile | null = null;
+	private timeblocksFile: TFile | null = null;
 	error: string | null = null;
 	isLoading: boolean = true;
 
@@ -63,6 +73,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		await this.loadSettings();
 		this.csvHandler = new CSVHandler(this.app.vault);
 		this.backupHandler = new BackupHandler(this.app.vault);
+		this.timeblocksHandler = new TimeblocksHandler(this.app.vault);
 
 		this.registerView(
 			VIEW_TYPE_TIME_TRACKER,
@@ -119,6 +130,7 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		this.app.workspace.onLayoutReady(async () => {
 			await this.loadTimesheet();
+			await this.loadTimeblocks();
 			await this.backupHandler.createBackup(this.settings.timesheetPath);
 			this.activateView();
 		});
@@ -246,6 +258,81 @@ export default class TimeTrackerPlugin extends Plugin {
 			console.error("Error saving timesheet:", err);
 			this.error = "Error saving Timesheet: " + err;
 		}
+	}
+
+	// ----- TIMEBLOCKS -----
+	async loadTimeblocks() {
+		try {
+			const file = this.app.vault.getAbstractFileByPath(
+				this.settings.timeblocksPath,
+			);
+
+			let newData: TimeblocksData;
+			if (file instanceof TFile) {
+				this.timeblocksFile = file;
+				newData = await this.timeblocksHandler.parseTimeblocks(file);
+			} else {
+				this.timeblocksFile = await this.timeblocksHandler.createTimeblocks(
+					this.settings.timeblocksPath,
+				);
+				newData = { timeblocks: [] };
+			}
+
+			// skip refresh if unchanged
+			if (JSON.stringify(this.timeblocksData) === JSON.stringify(newData)) {
+				return;
+			}
+
+			this.timeblocksData = newData;
+			this.refreshViews();
+		} catch (err) {
+			console.error("Error loading timeblocks:", err);
+		}
+	}
+
+	async saveTimeblocks() {
+		if (!this.timeblocksFile) return;
+
+		try {
+			await this.timeblocksHandler.writeTimeblocks(
+				this.timeblocksFile,
+				this.timeblocksData,
+			);
+		} catch (err) {
+			console.error("Error saving timeblocks:", err);
+		}
+	}
+
+	createTimeblock(timeblock: Omit<Timeblock, "id">): Timeblock {
+		const newTimeblock: Timeblock = {
+			id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
+			...timeblock,
+		};
+		this.timeblocksData.timeblocks.push(newTimeblock);
+		this.saveTimeblocks();
+		return newTimeblock;
+	}
+
+	updateTimeblock(id: number, changes: Partial<Timeblock>): void {
+		const index = this.timeblocksData.timeblocks.findIndex((t) => t.id === id);
+		if (index === -1) return;
+
+		this.timeblocksData.timeblocks[index] = {
+			...this.timeblocksData.timeblocks[index],
+			...changes,
+		};
+		this.saveTimeblocks();
+	}
+
+	deleteTimeblock(id: number): void {
+		this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.filter(
+			(t) => t.id !== id,
+		);
+		this.saveTimeblocks();
+	}
+
+	getTimeblockById(id: number): Timeblock | undefined {
+		return this.timeblocksData.timeblocks.find((t) => t.id === id);
 	}
 
 	get runningTimers(): TimeRecord[] {

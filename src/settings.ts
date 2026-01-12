@@ -45,6 +45,19 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Timeblocks file path")
+			.setDesc("Path to the timeblocks.csv file for planned time blocks (relative to vault root)")
+			.addText((text) =>
+				text
+					.setPlaceholder("timeblocks.csv")
+					.setValue(this.plugin.settings.timeblocksPath)
+					.onChange(async (value) => {
+						this.plugin.settings.timeblocksPath = value;
+						await this.refreshAndSavePlugin();
+					}),
+			);
+
 		// tracking behavior section
 		containerEl.createEl("h3", { text: "Tracking Behavior" });
 
@@ -58,6 +71,20 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.retroactiveTrackingEnabled)
 					.onChange(async (value) => {
 						this.plugin.settings.retroactiveTrackingEnabled = value;
+						await this.refreshAndSavePlugin();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Enable timeblocking")
+			.setDesc(
+				"Allow creating planned time blocks by clicking on the schedule calendar.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableTimeblocking)
+					.onChange(async (value) => {
+						this.plugin.settings.enableTimeblocking = value;
 						await this.refreshAndSavePlugin();
 					}),
 			);

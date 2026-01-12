@@ -8,10 +8,12 @@
 
 	const HEX_COLOR_REGEX = /^#([0-9a-f]{6})$/i;
 
-let { value, onChange }: Props = $props();
-let textValue = $state("");
+	let { value, onChange }: Props = $props();
+	let currentColor = $state(value);
+	let textValue = $state(value);
 
 	$effect(() => {
+		currentColor = value;
 		textValue = value;
 	});
 
@@ -22,19 +24,26 @@ let textValue = $state("");
 		return HEX_COLOR_REGEX.test(prefixed) ? prefixed.toLowerCase() : null;
 	};
 
+	const handleColorChange = (color: string) => {
+		currentColor = color;
+		textValue = color;
+		onChange(color);
+	};
+
 	const handleTextInput = (raw: string) => {
 		textValue = raw;
 		const normalized = normalizeHex(raw);
 		if (normalized) {
 			textValue = normalized;
-			if (normalized !== value) {
+			if (normalized !== currentColor) {
+				currentColor = normalized;
 				onChange(normalized);
 			}
 		}
 	};
 
 	const handleTextBlur = () => {
-		textValue = normalizeHex(textValue) ?? value;
+		textValue = normalizeHex(textValue) ?? currentColor;
 	};
 </script>
 
@@ -43,12 +52,12 @@ let textValue = $state("");
 		{#each PRESET_COLORS as presetColor}
 			<button
 				type="button"
-				class="w-full aspect-square rounded-md cursor-pointer transition-all duration-150 hover:scale-110 border-2 {value ===
+				class="w-full aspect-square rounded-md cursor-pointer transition-all duration-150 hover:scale-110 border-2 {currentColor ===
 				presetColor
 					? 'border-[--text-normal] ring-2 ring-[--background-primary]'
 					: 'border-transparent'}"
 				style="background-color: {presetColor};"
-				onclick={() => onChange(presetColor)}
+				onclick={() => handleColorChange(presetColor)}
 				aria-label="Select color {presetColor}"
 			></button>
 		{/each}
@@ -58,13 +67,13 @@ let textValue = $state("");
 		<input
 			type="color"
 			class="flex-1 h-8 p-0 border border-[--background-modifier-border] rounded cursor-pointer"
-			{value}
-			oninput={(e) => onChange(e.currentTarget.value)}
+			value={currentColor}
+			oninput={(e) => handleColorChange(e.currentTarget.value)}
 			aria-label="Custom color picker"
 		/>
 		<input
 			type="text"
-			class="text-xs border border-transparent outline-none cursor-text select-all w-18"
+			class="text-xs border border-transparent outline-none cursor-text select-all w-fit"
 			value={textValue}
 			oninput={(e) => handleTextInput(e.currentTarget.value)}
 			onclick={(e) => e.currentTarget.select()}

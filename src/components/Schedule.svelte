@@ -1,14 +1,15 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
-	import type { Project, TimeRecord } from "../types";
+	import type { Project, TimeRecord, Timeblock } from "../types";
 	import { formatNaturalDuration } from "../utils/timeUtils";
 	import { icon, yieldToMain } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
 	import timeGridPlugin from "@fullcalendar/timegrid";
 	import interactionPlugin from "@fullcalendar/interaction";
 	import { onMount, onDestroy } from "svelte";
-	import ICAL from "ical.js";
 	import { IcsEventModal } from "../modals/IcsEventModal";
+	import { CreateTimeblockModal } from "../modals/CreateTimeblockModal";
+	import { EditTimeblockModal } from "../modals/EditTimeblockModal";
 	import { Notice } from "obsidian";
 	import { fetchIcsCalendars } from "../utils/icsHandler";
 
@@ -30,17 +31,13 @@
 	let interval: number | undefined;
 	let projects = $derived(plugin.timesheetData?.projects ?? []);
 	let records = $derived(plugin.timesheetData?.records ?? []);
+	let timeblocks = $derived(plugin.timeblocksData?.timeblocks ?? []);
 
-	let icsEvents = $state<any[]>([]);
+	let icsEvents = $state<any[]>(plugin.icsCache.events);
 	let icsLoading = $state(false);
 	let zoomLevel = $state(plugin.settings.scheduleZoom);
 
 	const ZOOM_LEVELS = [15, 30, 60, 120];
-
-	$effect(() => {
-		icsEvents = plugin.icsCache.events;
-		icsLoading = !plugin.icsCache.fetched && plugin.icsCache.loading;
-	});
 
 	$effect(() => {
 		if (interval) clearInterval(interval);
@@ -57,7 +54,6 @@
 	async function refresh() {
 		await fetchIcsEvents(true);
 		await onRefresh();
-		await updateCalendarEvents();
 	}
 
 	function moveDay(delta: number) {
@@ -95,8 +91,10 @@
 	function applyZoom() {
 		if (calendar) {
 			const duration = `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`;
+			const snapDuration = `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`;
 			calendar.setOption("slotDuration", duration);
 			calendar.setOption("slotLabelInterval", duration);
+			calendar.setOption("snapDuration", snapDuration);
 		}
 		plugin.settings.scheduleZoom = zoomLevel;
 		plugin.saveSettings();
@@ -170,7 +168,65 @@
 			});
 		}
 
+		// process timeblocks (only if enabled)
+		if (!plugin.settings.enableTimeblocking) return events;
+		for (const timeblock of timeblocks) {
+			const tbStart = timeblock.startTime.getTime();
+			const tbEnd = timeblock.endTime.getTime();
+			if (tbEnd < start || tbStart > end) continue;
+
+			const clampedStart = new Date(Math.max(tbStart, start));
+			const clampedEnd = new Date(Math.min(tbEnd, end));
+
+			events.push(buildTimeblockEvent(timeblock, clampedStart, clampedEnd));
+		}
+
 		return events;
+	}
+
+	function buildTimeblockEvent(timeblock: Timeblock, start?: Date, end?: Date) {
+		const color = timeblock.color;
+		const eventStart = start ?? timeblock.startTime;
+		const eventEnd = end ?? timeblock.endTime;
+		return {
+			id: `timeblock-${timeblock.id}`,
+			title: timeblock.title,
+			start: eventStart,
+			end: eventEnd,
+			backgroundColor: `${color}80`,
+			borderColor: color,
+			classNames: ["timeblock-event"],
+			editable: true,
+			durationEditable: true,
+			extendedProps: {
+				isTimeblock: true,
+				timeblock: timeblock,
+				color: color,
+				duration: eventEnd.getTime() - eventStart.getTime(),
+			},
+		};
+	}
+
+	function addTimeblockToCalendar(timeblock: Timeblock) {
+		if (!calendar || !plugin.settings.enableTimeblocking) return;
+		calendar.addEvent(buildTimeblockEvent(timeblock));
+	}
+
+	function updateTimeblockOnCalendar(timeblock: Timeblock) {
+		if (!calendar || !plugin.settings.enableTimeblocking) return;
+		const event = calendar.getEventById(`timeblock-${timeblock.id}`);
+		if (event) {
+			event.remove();
+		}
+		addTimeblockToCalendar(timeblock);
+	}
+
+	function removeTimeblockFromCalendar(id: number) {
+		if (!calendar) return;
+		const event = calendar.getEventById(`timeblock-${id}`);
+		if (event) {
+			event.remove();
+		}
 	}
 
 
@@ -179,11 +235,12 @@
 			return;
 		}
 		icsLoading = true;
-		
+
 		await fetchIcsCalendars(plugin);
 
 		icsEvents = plugin.icsCache.events;
 		icsLoading = false;
+		await updateCalendarEvents();
 	}
 
 	function reloadIcsCalendars() {
@@ -255,6 +312,7 @@
 			slotMaxTime: "24:00:00",
 			slotDuration: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
 			slotLabelInterval: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+			snapDuration: `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`,
 			allDaySlot: false,
 			nowIndicator: true,
 			scrollTime: getCurrentScrollTime(),
@@ -278,7 +336,16 @@
 			eventShortHeight: 100000,
 			events: [...buildCalendarEvents(), ...icsEvents],
 			dateClick(arg) {
-				console.log("Date clicked:", arg.date);
+				if (!plugin.settings.enableTimeblocking) return;
+				const startDate = arg.date;
+				const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+				new CreateTimeblockModal(
+					plugin.app,
+					plugin,
+					startDate,
+					endDate,
+					(timeblock) => addTimeblockToCalendar(timeblock),
+				).open();
 			},
 			eventClick: (info) => {
 				const props = info.event.extendedProps;
@@ -291,9 +358,51 @@
 						location: props.location,
 						url: props.url,
 						color: props.color,
+						sourceName: props.sourceName,
 					}).open();
+				} else if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) return;
+					const currentTimeblock = plugin.getTimeblockById(props.timeblock.id);
+					if (!currentTimeblock) return;
+					new EditTimeblockModal(
+						plugin.app,
+						plugin,
+						currentTimeblock,
+						(updated: Timeblock) => updateTimeblockOnCalendar(updated),
+						(id: number) => removeTimeblockFromCalendar(id),
+					).open();
 				} else if (props?.project && props?.record) {
 					onEditRecord(props.record, props.project);
+				}
+			},
+			eventDrop: (info) => {
+				const props = info.event.extendedProps;
+				if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) {
+						info.revert();
+						return;
+					}
+					plugin.updateTimeblock(props.timeblock.id, {
+						startTime: info.event.start!,
+						endTime: info.event.end!,
+					});
+				} else {
+					info.revert();
+				}
+			},
+			eventResize: (info) => {
+				const props = info.event.extendedProps;
+				if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) {
+						info.revert();
+						return;
+					}
+					plugin.updateTimeblock(props.timeblock.id, {
+						startTime: info.event.start!,
+						endTime: info.event.end!,
+					});
+				} else {
+					info.revert();
 				}
 			},
 			eventContent: (arg) => {
@@ -321,10 +430,12 @@
 					if (duration != 0 && duration < compactThreshold) {
 						return {
 							html: `
-								<div class="flex flex-row gap-1 justify-start items-center p-0 pl-1 w-full h-full overflow-hidden whitespace-nowrap"
-								style="flex-direction: row;">
-									<div class="font-bold text-sm shrink-0">${arg.event.title}:</div>
-									<div class="text-sm opacity-95 truncate">${arg.timeText}</div>
+								<div class="flex flex-col justify-center p-0 pl-1 w-full h-full overflow-hidden">
+									${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
+									<div class="flex flex-row gap-1 justify-start items-center whitespace-nowrap">
+										<div class="font-bold text-sm shrink-0">${arg.event.title}:</div>
+										<div class="text-sm opacity-95 truncate">${arg.timeText}</div>
+									</div>
 								</div>
 							`,
 						};
@@ -334,8 +445,38 @@
 						html: `
 							<div class="flex flex-column gap-0.5 justify-start items-start p-0 pl-1 w-full h-full"
 							style="flex-direction: column;">
+								${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
 								<div class="font-bold text-sm">${arg.event.title} </div>
 								<div class="text-sm opacity-95">${arg.timeText}</div>
+							</div>
+						`,
+					};
+				} else if (props?.isTimeblock) {
+					// timeblock events
+					const color = props.color || "#6b7280";
+					const notes = props.timeblock?.notes;
+
+					if (duration < compactThreshold) {
+						return {
+							html: `
+								<div class="timeblock-content" style="border-left: 3px solid ${color};">
+									<div class="font-bold text-sm truncate">${arg.event.title}</div>
+								</div>
+							`,
+						};
+					}
+
+					let notesHtml = "";
+					if (notes) {
+						const formattedNotes = notes.replace(/\n/g, "<br>");
+						notesHtml = `<div class="text-xs opacity-70 mt-1 overflow-hidden">${formattedNotes}</div>`;
+					}
+
+					return {
+						html: `
+							<div class="timeblock-content" style="border-left: 3px solid ${color};">
+								<div class="font-bold text-sm">${arg.event.title}</div>
+								${notesHtml}
 							</div>
 						`,
 					};
@@ -421,8 +562,10 @@
 		// track dependencies
 		projects;
 		records;
+		timeblocks;
 		selectedDate;
 		icsEvents;
+		plugin.settings.enableTimeblocking;
 		updateCalendarEvents();
 	});
 </script>
@@ -612,5 +755,24 @@
 	/* hide details only when FC marks it as short */
 	:global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
 		display: none;
+	}
+
+	/* timeblock events */
+	:global(.fc .fc-event.timeblock-event) {
+		opacity: 0.85;
+		cursor: grab;
+	}
+
+	:global(.fc .fc-event.timeblock-event:hover) {
+		opacity: 1;
+	}
+
+	:global(.timeblock-content) {
+		display: flex;
+		flex-direction: column;
+		padding: 4px 8px;
+		height: 100%;
+		overflow: hidden;
+		min-width: 0;
 	}
 </style>

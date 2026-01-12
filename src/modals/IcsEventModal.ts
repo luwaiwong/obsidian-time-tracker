@@ -8,6 +8,7 @@ interface IcsEventData {
 	location: string;
 	url: string;
 	color: string;
+	sourceName?: string;
 }
 
 export class IcsEventModal extends Modal {
@@ -29,6 +30,17 @@ export class IcsEventModal extends Modal {
 		colorBar.style.backgroundColor = this.data.color || "#6b7280";
 		colorBar.style.marginBottom = "16px";
 		colorBar.style.borderRadius = "3px";
+
+		// source name
+		if (this.data.sourceName) {
+			const sourceEl = contentEl.createDiv();
+			sourceEl.style.fontSize = "0.75em";
+			sourceEl.style.color = "var(--text-muted)";
+			sourceEl.style.marginBottom = "4px";
+			sourceEl.style.textTransform = "uppercase";
+			sourceEl.style.letterSpacing = "0.05em";
+			sourceEl.setText(this.data.sourceName);
+		}
 
 		// title
 		const titleEl = contentEl.createEl("h2", { text: this.data.title });

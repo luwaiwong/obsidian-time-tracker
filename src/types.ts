@@ -26,6 +26,15 @@ export interface TimeRecord {
 	title: string;
 }
 
+export interface Timeblock {
+	id: number;
+	title: string;
+	startTime: Date;
+	endTime: Date;
+	color: string;
+	notes: string;
+}
+
 /** A category for organizing projects */
 export interface Category {
 	id: number;
@@ -38,9 +47,11 @@ export interface Category {
 /** Plugin settings stored in separate JSON file */
 export interface PluginSettings {
 	timesheetPath: string;
+	timeblocksPath: string;
 	settingsPath: string;
 
 	retroactiveTrackingEnabled: boolean;
+	enableTimeblocking: boolean;
 	showSeconds: boolean;
 	showArchivedProjects: boolean;
 	gridColumns: number;
@@ -58,6 +69,10 @@ export interface TimesheetData {
 	records: TimeRecord[];
 	projects: Project[];
 	categories: Category[];
+}
+
+export interface TimeblocksData {
+	timeblocks: Timeblock[];
 }
 
 export interface ChartDataPoint {
