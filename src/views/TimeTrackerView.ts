@@ -81,6 +81,9 @@ export class TimeTrackerView extends ItemView {
 			target: content,
 			props: {
 				plugin: this.plugin,
+				onRefresh: () => {
+					this.onScheduleRefresh();
+				},
 				onOpenAnalytics: () => {
 					this.plugin.activateAnalyticsView();
 				},
@@ -102,6 +105,11 @@ export class TimeTrackerView extends ItemView {
 				},
 			},
 		});
+	}
+
+	async onScheduleRefresh() {
+		this.plugin.loadTimesheet();
+		this.refresh();
 	}
 
 	async onClose() {

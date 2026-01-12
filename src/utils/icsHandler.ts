@@ -42,7 +42,7 @@ import { yieldToMain } from "./styleUtils";
 							title: event.summary || "Untitled",
 							start,
 							end: end || start,
-							backgroundColor: "var(--background-secondary)",
+							backgroundColor: "var(--background-primary-alt)",
 							borderColor: icsColor,
 							borderWidth: "3px",
 							classNames: ["ics-event"],

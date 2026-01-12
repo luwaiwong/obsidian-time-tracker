@@ -14,12 +14,13 @@
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
+		onRefresh: () => void;
 		onOpenAnalytics: () => void;
 		onOpenSettings: () => void;
 		onEditRecord: (record: TimeRecord, project: Project) => void;
 	}
 
-	let { plugin, onOpenAnalytics, onOpenSettings, onEditRecord }: Props =
+	let { plugin, onRefresh, onOpenAnalytics, onOpenSettings, onEditRecord }: Props =
 		$props();
 
 	let calendarEl: HTMLDivElement;
@@ -52,6 +53,12 @@
 			if (interval) clearInterval(interval);
 		};
 	});
+
+	async function refresh() {
+		await fetchIcsEvents(true);
+		await onRefresh();
+		await updateCalendarEvents();
+	}
 
 	function moveDay(delta: number) {
 		const next = new Date(selectedDate);
@@ -304,9 +311,14 @@
 					}
 				}
 
+				// thresholds based on zoom level (in ms)
+				const slotMs = zoomLevel * 60 * 1000;
+				const minimizeThreshold = slotMs / 2; // minimize if less than half a slot
+				const compactThreshold = slotMs * 1.5; // compact if less than 1.5 slots
+
 				// ics events
 				if (props?.isIcs) {
-					if (duration != 0 && duration < 60 * 60 * 1000) {
+					if (duration != 0 && duration < compactThreshold) {
 						return {
 							html: `
 								<div class="flex flex-row gap-1 justify-start items-center p-0 pl-1 w-full h-full overflow-hidden whitespace-nowrap"
@@ -327,16 +339,16 @@
 							</div>
 						`,
 					};
-				} else; {
-					// time tracker events under 30 minutes
-					if (duration < 30 * 60 * 1000) {
+				} else {
+					// time tracker events - minimize if less than threshold
+					if (duration < minimizeThreshold) {
 						return {
 							html: `<div class="flex flex-col gap-0.5"></div>`,
 						};
 					}
 
-					// time tracker events under 1.5 hours
-					if (duration < 90 * 60 * 1000) {
+					// time tracker events - compact view
+					if (duration < compactThreshold) {
 						return {
 							html: `
 								<div class="flex flex-row gap-1 justify-start items-center p-0 w-full"
@@ -347,7 +359,7 @@
 							`,
 						};
 					}
-					// time tracker events over 1.5 hours
+					// time tracker events - full view
 					return {
 						html: `
 							<div class="flex flex-column justify-start items-center p-0 w-full"
@@ -480,24 +492,38 @@
 					cursor: pointer;
 
 				"
+				aria-label="Refresh"
+				onclick={refresh}
+				{@attach icon("refresh-ccw")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+
+				"
 				aria-label="Open Analytics"
 				onclick={onOpenAnalytics}
 				{@attach icon("bar-chart-2")}
 			></button>
-		<button
-			class="bg-transparent shrink-0"
-			style="
-				background-color: transparent;
-				border: none;
-				padding: 0;
-				margin: 0;
-				cursor: pointer;
+			<button
+				class="bg-transparent shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
 
-			"
-			aria-label="Open Settings"
-			onclick={onOpenSettings}
-			{@attach icon("settings")}
-		></button>
+				"
+				aria-label="Open Settings"
+				onclick={onOpenSettings}
+				{@attach icon("settings")}
+			></button>
 		</div>
 	</div>
 
@@ -548,6 +574,7 @@
 
 	:global(.fc .fc-event) {
 		border-radius: 6px;
+		border-color: var(--background-modifier-border);
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	}
 
