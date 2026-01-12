@@ -402,8 +402,15 @@
 						info.revert();
 						return;
 					}
+					
+					// snap snart to the nearest slot
+					const slotDuration = zoomLevel * 60 * 1000;
+					const startTime = new Date(info.event.start!);
+					startTime.setMinutes(Math.floor(startTime.getMinutes() / slotDuration) * slotDuration);
+
+					info.event.setStart(startTime);					
 					await plugin.updateTimeblock(props.timeblock.id, {
-						startTime: info.event.start!,
+						startTime: startTime,
 						endTime: info.event.end!,
 					});
 				} else {
