@@ -19,7 +19,7 @@ export class AnalyticsView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Time Analytics";
+		return "Analytics";
 	}
 
 	getIcon(): string {

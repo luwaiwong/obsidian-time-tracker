@@ -3,6 +3,7 @@
 	import type TimeTrackerPlugin from "../../main";
 	import {
 		formatDuration,
+		formatNaturalDuration,
 		getProjectDuration,
 		getTimeRange,
 	} from "../utils/timeUtils";
@@ -22,6 +23,11 @@
 	let customStartDate = $state(new Date());
 	let customEndDate = $state(new Date());
 	let showArchived = $state(false);
+	let showByCategory = $state(false);
+	let filterProjectIds: number[] = $state([]);
+	let filterCategoryIds: number[] = $state([]);
+	let showCategoryDropdown = $state(false);
+	let showProjectDropdown = $state(false);
 
 	let pieChartCanvas: HTMLCanvasElement | undefined = $state();
 	let lineChartCanvas: HTMLCanvasElement | undefined = $state();
@@ -49,17 +55,59 @@
 		return getTimeRange(timeRange, currentDate);
 	});
 
-	let filteredProjects = $derived(
+	let allProjects = $derived(
 		showArchived
 			? plugin.timesheetData.projects
 			: plugin.timesheetData.projects.filter((p) => !p.archived),
 	);
 
-	let filteredCategories = $derived(
+	let allCategories = $derived(
 		showArchived
 			? plugin.timesheetData.categories
 			: plugin.timesheetData.categories.filter((c) => !c.archived),
 	);
+
+	let filteredProjects = $derived.by(() => {
+		let projects = allProjects;
+		if (filterProjectIds.length > 0) {
+			projects = projects.filter((p) => filterProjectIds.includes(p.id));
+		}
+		if (filterCategoryIds.length > 0) {
+			projects = projects.filter((p) => p.categoryId !== undefined && filterCategoryIds.includes(p.categoryId));
+		}
+		return projects;
+	});
+
+	let filteredCategories = $derived.by(() => {
+		if (filterCategoryIds.length > 0) {
+			return allCategories.filter((c) => filterCategoryIds.includes(c.id));
+		}
+		return allCategories;
+	});
+
+	function toggleCategoryFilter(id: number) {
+		if (filterCategoryIds.includes(id)) {
+			filterCategoryIds = filterCategoryIds.filter((i) => i !== id);
+		} else {
+			filterCategoryIds = [...filterCategoryIds, id];
+		}
+	}
+
+	function toggleProjectFilter(id: number) {
+		if (filterProjectIds.includes(id)) {
+			filterProjectIds = filterProjectIds.filter((i) => i !== id);
+		} else {
+			filterProjectIds = [...filterProjectIds, id];
+		}
+	}
+
+	function handleClickOutside(event: MouseEvent) {
+		const target = event.target as HTMLElement;
+		if (!target.closest(".relative")) {
+			showCategoryDropdown = false;
+			showProjectDropdown = false;
+		}
+	}
 
 	let totalTime = $derived(
 		filteredProjects.reduce(
@@ -76,6 +124,38 @@
 	);
 
 	let pieChartData = $derived.by(() => {
+		if (showByCategory) {
+			// aggregate by category
+			const categoryTotals = new Map<number, number>();
+			for (const project of filteredProjects) {
+				const duration = getProjectDuration(
+					project.id,
+					plugin.timesheetData.records,
+					dateRange.start,
+					dateRange.end,
+				);
+				if (duration > 0) {
+					const catId = project.categoryId ?? -1;
+					categoryTotals.set(catId, (categoryTotals.get(catId) ?? 0) + duration);
+				}
+			}
+
+			const result: { label: string; value: number; color: string }[] = [];
+			for (const category of filteredCategories) {
+				const value = categoryTotals.get(category.id) ?? 0;
+				if (value > 0) {
+					result.push({ label: category.name, value, color: category.color });
+				}
+			}
+			// add uncategorized
+			const uncategorized = categoryTotals.get(-1) ?? 0;
+			if (uncategorized > 0) {
+				result.push({ label: "Uncategorized", value: uncategorized, color: "#888888" });
+			}
+			return result;
+		}
+
+		// show by project
 		const projectData = filteredProjects
 			.map((project) => ({
 				label: project.name,
@@ -246,13 +326,15 @@
 			},
 			options: {
 				responsive: true,
-				maintainAspectRatio: true,
+				maintainAspectRatio: false,
 				plugins: {
 					legend: {
-						position: "right",
+						position: "bottom",
 						labels: {
 							color: style.getPropertyValue("--text-normal"),
-							font: { size: 12 },
+							font: { size: 11 },
+							boxWidth: 12,
+							padding: 8,
 						},
 					},
 					tooltip: {
@@ -286,17 +368,20 @@
 			data: lineChartData,
 			options: {
 				responsive: true,
-				maintainAspectRatio: true,
+				maintainAspectRatio: false,
 				interaction: { mode: "index", intersect: false },
 				plugins: {
 					legend: {
-						position: "top",
+						position: "bottom",
 						labels: {
 							color: style.getPropertyValue("--text-normal"),
-							font: { size: 12 },
+							font: { size: 11 },
+							boxWidth: 12,
+							padding: 8,
 						},
 					},
 					tooltip: {
+						itemSort: (a, b) => (b.parsed.y ?? 0) - (a.parsed.y ?? 0),
 						callbacks: {
 							label: (context) =>
 								`${context.dataset.label}: ${context.parsed.y?.toFixed(1) ?? "0"}%`,
@@ -357,22 +442,24 @@
 		}
 		return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, { ...opts, year: "numeric" })}`;
 	});
+
 </script>
 
-<div class="p-6 h-full overflow-y-auto">
-	<h3 class="m-0 mb-6 text-xl font-semibold">Time Analytics</h3>
+<svelte:window onclick={handleClickOutside} />
+
+<div class="p-4 h-full overflow-y-auto">
+	<!-- <h3 class="m-0 mb-4 text-xl font-semibold">Analytics</h3> -->
 
 	<!-- controls -->
-	<div class="flex justify-between items-center mb-6 gap-4 flex-wrap">
-		<div class="flex gap-3 items-center flex-wrap">
+	<div class="flex flex-col gap-2 mb-4 w-full">
+		<div class="flex justify-between items-center gap-2 flex-wrap text-sm w-full">
 			<select
 				bind:value={timeRange}
-				class="px-3 py-2 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal)"
 			>
-				<option value="day">Day</option>
-				<option value="week">Week</option>
-				<option value="month">Month</option>
-				<option value="year">Year</option>
+				<option value="day">By Day</option>
+				<option value="week">By Week</option>
+				<option value="month">By Month</option>
+				<option value="year">By Year</option>
 				<option value="custom">Custom</option>
 			</select>
 
@@ -380,20 +467,17 @@
 				<div class="flex gap-1 items-center">
 					<button
 						onclick={() => shiftPeriod(-1)}
-						class="px-2 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover)"
 					>
 						←
 					</button>
 					<button
 						onclick={() => (currentDate = new Date())}
-						class="px-3 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover) min-w-[140px]"
 						title="Click to reset to today"
 					>
 						{dateRangeLabel}
 					</button>
 					<button
 						onclick={() => shiftPeriod(1)}
-						class="px-2 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover)"
 					>
 						→
 					</button>
@@ -405,7 +489,6 @@
 						value={formatDateForInput(customStartDate)}
 						onchange={(e) =>
 							(customStartDate = new Date(e.currentTarget.value))}
-						class="px-2 py-2 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal)"
 					/>
 					<span class="text-(--text-muted)">to</span>
 					<input
@@ -413,34 +496,127 @@
 						value={formatDateForInput(customEndDate)}
 						onchange={(e) =>
 							(customEndDate = new Date(e.currentTarget.value))}
-						class="px-2 py-2 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal)"
 					/>
 				</div>
 			{/if}
+
+			<div class="px-2 py-1 bg-(--background-secondary) rounded">
+				<strong>Total:</strong> {formatDuration(totalTime, false)}
+			</div>
 		</div>
 
-		<div class="flex items-center gap-4">
-			<label class="flex items-center gap-2 cursor-pointer text-sm">
+		<!-- line -->
+		 <hr style="margin: 0; padding: 0; margin-bottom: 8px; margin-top: 8px">
+
+		<!-- filters row -->
+		<div class="flex justify-start gap-2 items-center flex-wrap text-sm">
+			<!-- category multi-select -->
+			<div class="relative">
+				<button
+					onclick={() => { showCategoryDropdown = !showCategoryDropdown; showProjectDropdown = false; }}
+					class="px-2 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+				>
+					{filterCategoryIds.length === 0 ? "All categories" : `${filterCategoryIds.length} selected`}
+				</button>
+				{#if showCategoryDropdown}
+					<div class="absolute top-full left-0 mt-1 bg-(--background-primary) border border-(--background-modifier-border) rounded shadow-lg z-10 min-w-[160px] max-h-[400px] overflow-y-auto">
+						<button
+							onclick={() => { filterCategoryIds = []; }}
+							class="w-full px-3 py-1.5 text-left hover:bg-(--background-modifier-hover) text-(--text-muted)"
+						>
+							Clear all
+						</button>
+						{#each allCategories as category}
+							<label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-(--background-modifier-hover)">
+								<input
+									type="checkbox"
+									checked={filterCategoryIds.includes(category.id)}
+									onchange={() => toggleCategoryFilter(category.id)}
+								/>
+								<span class="w-2 h-2 rounded-full" style="background-color: {category.color}"></span>
+								{category.name}
+							</label>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- project multi-select -->
+			<div class="relative">
+				<button
+					onclick={() => { showProjectDropdown = !showProjectDropdown; showCategoryDropdown = false; }}
+					class="px-2 py-1 border border-(--background-modifier-border) rounded  text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+				>
+					{filterProjectIds.length === 0 ? "All projects" : `${filterProjectIds.length} selected`}
+				</button>
+				{#if showProjectDropdown}
+					<div class="absolute top-full left-0 mt-1 bg-(--background-primary) border border-(--background-modifier-border) rounded shadow-lg z-10 min-w-[160px] max-h-[400px] overflow-y-auto">
+						<button
+							onclick={() => { filterProjectIds = []; }}
+							class="w-full px-3 py-1.5 text-left hover:bg-(--background-modifier-hover) text-(--text-muted)"
+						>
+							Clear all
+						</button>
+						{#each allProjects as project}
+							<label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-(--background-modifier-hover)">
+								<input
+									type="checkbox"
+									checked={filterProjectIds.includes(project.id)}
+									onchange={() => toggleProjectFilter(project.id)}
+								/>
+								<span class="w-2 h-2 rounded-full" style="background-color: {project.color}"></span>
+								{project.name}
+							</label>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<label class="flex items-center gap-2 px-2 py-1 bg-(--background-secondary) rounded-sm hover:bg-(--background-modifier-hover)">
 				<input type="checkbox" bind:checked={showArchived} />
 				Show archived
 			</label>
-			<div class="px-4 py-2 bg-(--background-secondary) rounded">
-				<strong>Total:</strong>
-				{formatDuration(totalTime, false)}
-			</div>
 		</div>
 	</div>
 
 	<!-- charts -->
-	<div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));">
-		<div class="bg-(--background-secondary) p-5 rounded-lg">
-			<h4 class="m-0 mb-4 font-medium">Time Distribution</h4>
-			<canvas bind:this={pieChartCanvas} class="max-h-[400px]"></canvas>
+	<div class="grid gap-4 w-full" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));">
+		<div class="bg-(--background-secondary) p-4 pt-0 rounded-lg overflow-hidden">
+			<div class="flex justify-between items-center mb-2">
+				<h4 class="m-0 font-medium">Distribution</h4>
+				<label class="flex items-center gap-2 cursor-pointer text-sm">
+					<input type="checkbox" bind:checked={showByCategory} />
+					By category
+				</label>
+			</div>
+			<div class="h-[300px] w-full">
+				<canvas bind:this={pieChartCanvas}></canvas>
+			</div>
+			<!-- list of projects sorted by duration -->
+			<div class="flex justify-start flex-col items-start gap-2 pt-4">
+				{#each 
+					filteredProjects.sort(
+						(a, b) => getProjectDuration(b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getProjectDuration(a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as project}
+					{#if getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0}
+						<div class="flex items-center w-full p-2 rounded-lg gap-2" style="background-color: {project.color}">
+							<p class="text-md font-bold">
+								{project.name}:
+							</p>
+							<p class="text-md">
+								{formatNaturalDuration(getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end))}
+							</p>
+						</div>
+					{/if}
+				{/each}
+			</div>
+
 		</div>
 
-		<div class="bg-(--background-secondary) p-5 rounded-lg">
-			<h4 class="m-0 mb-4 font-medium">Timeline</h4>
-			<canvas bind:this={lineChartCanvas} class="max-h-[400px]"></canvas>
+		<div class="bg-(--background-secondary) p-4 pt-0 rounded-lg overflow-hidden">
+			<h4 class="m-0 mb-2 font-medium">Timeline</h4>
+			<div class="min-h-[250px] w-full">
+				<canvas bind:this={lineChartCanvas}></canvas>
+			</div>
 		</div>
 	</div>
 </div>
