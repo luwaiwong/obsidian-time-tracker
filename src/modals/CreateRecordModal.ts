@@ -4,9 +4,7 @@ import type { Project, TimeRecord } from "../types";
 import ProjectSelector from "../components/ProjectSelector.svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
-import RecentRecords from "../components/RecentRecords.svelte";
 import Cards from "../components/Cards.svelte";
-import MiniTitle from "../components/MiniTitle.svelte";
 import { mount, unmount } from "svelte";
 import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
 
