@@ -500,7 +500,7 @@
 				</div>
 			{/if}
 
-			<button class="px-2 py-1 bg-(--background-secondary) rounded">
+			<button class="px-2 py-1 rounded">
 				Total: {formatDuration(totalTime, false)}
 			</button>
 		</div>
@@ -514,7 +514,8 @@
 			<div class="relative">
 				<button
 					onclick={() => { showCategoryDropdown = !showCategoryDropdown; showProjectDropdown = false; }}
-					class="px-2 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+					class="px-2 py-1 border border-(--background-modifier-border) rounded bg-(--background-primary) text-(--text-normal) hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+					style="cursor: pointer;"
 				>
 					{filterCategoryIds.length === 0 ? "All categories" : `${filterCategoryIds.length} selected`}
 				</button>
@@ -545,7 +546,8 @@
 			<div class="relative">
 				<button
 					onclick={() => { showProjectDropdown = !showProjectDropdown; showCategoryDropdown = false; }}
-					class="px-2 py-1 border border-(--background-modifier-border) rounded  text-(--text-normal) cursor-pointer hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+					class="px-2 py-1 border border-(--background-modifier-border) rounded  text-(--text-normal) hover:bg-(--background-modifier-hover) min-w-[120px] text-left"
+					style="cursor: pointer;"
 				>
 					{filterProjectIds.length === 0 ? "All projects" : `${filterProjectIds.length} selected`}
 				</button>
@@ -572,10 +574,14 @@
 				{/if}
 			</div>
 
-			<label class="flex items-center gap-2 px-2 py-1 bg-(--background-secondary) rounded-sm hover:bg-(--background-modifier-hover)">
-				<input type="checkbox" bind:checked={showArchived} />
+			<button class="flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-(--background-modifier-hover)"
+			style="
+				cursor: pointer;
+				{showArchived ? 'background-color: var(--interactive-accent); color: var(--text-on-accent)' : ''} 
+				"
+			onclick={() => showArchived = !showArchived}>
 				Show archived
-			</label>
+			</button>
 		</div>
 	</div>
 
@@ -598,7 +604,12 @@
 					filteredProjects.sort(
 						(a, b) => getProjectDuration(b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getProjectDuration(a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as project}
 					{#if getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0}
-						<div class="flex items-center w-full p-2 rounded-lg gap-2" style="background-color: {project.color}">
+						<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)"
+							>
+							<div class="flex items-center rounded-lg p-2"
+							style="background-color: {project.color}">	
+								<span class="text-xl">{project.icon}</span>
+							</div>
 							<p class="text-md font-bold">
 								{project.name}:
 							</p>

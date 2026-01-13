@@ -45,7 +45,7 @@
 				>
 					<!-- project name and title -->
 					<div
-						class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
+						class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer  "
 						onclick={() => handleEdit(record)}
 						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
 						role="button"
@@ -59,17 +59,18 @@
 					>
 						{#if project}
 							<div
-								class="rounded flex items-center justify-center pr-1"
+								class="rounded flex items-center justify-center pr-1 min-w-0 overflow-hidden"
 							>
 								<button
-									class="flex items-center justify-center rounded-lg mr-2"
+									class="flex items-center justify-center rounded-lg mr-2 shrink-0"
 									style="background-color: {project.color}; cursor: pointer; font-size: 1rem; height: 2rem; width: 3rem;"
 									aria-label="Edit project"
 									>{project.icon}</button
 								>
 
-								<span class="text-xs font-medium shrink-0"
-									>{project.name}</span
+								<p class="text-xs font-medium min-w-0"
+									style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+									>{project.name}</p
 								>
 							</div>
 						{:else}
@@ -87,7 +88,7 @@
 						{/if}
 					</div>
 
-					<div class="text-xs text-(--text-normal) tabular-nums cursor-pointer pr-2"
+					<div class="text-xs text-(--text-normal) tabular-nums cursor-pointer pl-1  pr-2"
 						onclick={() => handleEdit(record)}
 						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
 						role="button"
