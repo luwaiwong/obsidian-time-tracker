@@ -1,7 +1,7 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
-import { CSVHandler } from "../utils/csvHandler";
+import { CSVHandler } from "../handlers/csvHandler";
 
 export class CreateProjectModal extends Modal {
 	plugin: TimeTrackerPlugin;

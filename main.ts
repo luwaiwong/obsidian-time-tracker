@@ -5,9 +5,9 @@ import {
 	VIEW_TYPE_TIME_TRACKER,
 } from "./src/views/TimeTrackerView";
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
-import { CSVHandler } from "./src/utils/csvHandler";
-import { BackupHandler } from "./src/utils/backupHandler";
-import { TimeblocksHandler } from "./src/utils/timeblocksHandler";
+import { CSVHandler } from "./src/handlers/csvHandler";
+import { BackupHandler } from "./src/handlers/backupHandler";
+import { TimeblocksHandler } from "./src/handlers/timeblocksHandler";
 import type {
 	PluginSettings,
 	TimesheetData,
@@ -19,6 +19,7 @@ import type {
 import { ImportModal } from "./src/modals/ImportSTTModal";
 import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
+import { CategoryHandler } from "./src/handlers/categoryHandler";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -52,6 +53,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	csvHandler: CSVHandler;
 	backupHandler: BackupHandler;
 	timeblocksHandler: TimeblocksHandler;
+	categoryHandler: CategoryHandler;
 	private timesheetFile: TFile | null = null;
 	private timeblocksFile: TFile | null = null;
 	error: string | null = null;
@@ -72,7 +74,8 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.csvHandler = new CSVHandler(this.app.vault);
 		this.backupHandler = new BackupHandler(this.app.vault);
 		this.timeblocksHandler = new TimeblocksHandler(this.app.vault);
-
+		this.categoryHandler = new CategoryHandler(this);
+		
 		this.registerView(
 			VIEW_TYPE_TIME_TRACKER,
 			(leaf) => new TimeTrackerView(leaf, this),

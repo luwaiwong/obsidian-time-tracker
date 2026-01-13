@@ -1,8 +1,8 @@
 import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { TimeRecord, Project } from "../types";
-import { CSVHandler } from "../utils/csvHandler";
-import { BackupHandler } from "../utils/backupHandler";
+import { CSVHandler } from "../handlers/csvHandler";
+import { BackupHandler } from "../handlers/backupHandler";
 import BackupCard from "../components/BackupCard.svelte";
 import { mount, unmount } from "svelte";
 

@@ -2,7 +2,7 @@
 import ICAL from "ical.js";
 import TimeTrackerPlugin from "main";
 import { Notice } from "obsidian";
-import { yieldToMain } from "./styleUtils";
+import { yieldToMain } from "../utils/styleUtils";
 
 export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 	if (plugin.icsCache.loading) {

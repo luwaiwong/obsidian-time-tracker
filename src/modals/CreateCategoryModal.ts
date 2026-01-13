@@ -148,22 +148,7 @@ export class CreateCategoryModal extends Modal {
 			return;
 		}
 
-		const newId =
-			Math.max(
-				...this.plugin.timesheetData.categories.map((c) => c.id),
-				0,
-			) + 1;
-
-		const newCategory = {
-			id: newId,
-			name: this.nameInput.trim(),
-			color: this.colorInput,
-			archived: false,
-			order: this.plugin.timesheetData.categories.length,
-		};
-
-		this.plugin.timesheetData.categories.push(newCategory);
-		await this.plugin.saveTimesheet();
+		await this.plugin.categoryHandler.createCategory(this.nameInput.trim(), this.colorInput);
 		this.plugin.refreshViews();
 		this.onSave();
 		this.close();
