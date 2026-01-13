@@ -63,7 +63,7 @@
 							>
 								<button
 									class="flex items-center justify-center rounded-lg mr-2"
-									style="background-color: {project.color}; cursor: pointer; font-size: 1rem; height: 2rem; width: 2rem;"
+									style="background-color: {project.color}; cursor: pointer; font-size: 1rem; height: 2rem; width: 3rem;"
 									aria-label="Edit project"
 									>{project.icon}</button
 								>
@@ -100,8 +100,8 @@
 					</div>
 					<!-- buttons -->
 					<button
-						class="size-10 rounded p-0"
-						style="cursor: pointer;"
+						class="rounded p-0"
+						style="width: 3rem; height: 2rem; font-size: 1rem; cursor: pointer;"
 						aria-label="Repeat"
 						onclick={() => handleRepeat(record)}
 						{@attach icon("repeat")}
