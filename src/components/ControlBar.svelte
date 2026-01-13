@@ -133,7 +133,7 @@
 	<!-- CONTROL AREA -->
 	<div
 		class="grid gap-2"
-		style="grid-template-columns: 48px 1fr auto; align-items: stretch;"
+		style="grid-template-columns: 3rem 1fr auto; align-items: stretch;"
 	>
 		<!-- play button -->
 		{#if isTracking}
@@ -161,7 +161,7 @@
 		<div
 			class="px-4 py-3 rounded-lg text-left transition-colors hover:bg-(--background-modifier-hover) cursor-pointer overflow-hidden"
 			style="border: {isTracking && currentProject
-				? `3px solid ${currentProject.color}`
+				? `2px solid ${currentProject.color}`
 				: '2px solid var(--background-modifier-hover)'};"
 			onclick={handleMainButtonClick}
 			onkeydown={(e) => e.key === "Enter" && handleMainButtonClick()}

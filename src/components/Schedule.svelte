@@ -11,7 +11,7 @@
 	import { CreateTimeblockModal } from "../modals/CreateTimeblockModal";
 	import { EditTimeblockModal } from "../modals/EditTimeblockModal";
 	import { Notice } from "obsidian";
-	import { fetchIcsCalendars } from "../utils/icsHandler";
+	import { fetchIcsCalendars } from "../handlers/icsHandler";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -403,8 +403,8 @@
 						return;
 					}
 					
-					// snap snart to the nearest slot
-					const slotDuration = zoomLevel * 60 * 1000;
+					// snap snart to the nearest half slot
+					const slotDuration = zoomLevel / 2 ;
 					const startTime = new Date(info.event.start!);
 					startTime.setMinutes(Math.floor(startTime.getMinutes() / slotDuration) * slotDuration);
 

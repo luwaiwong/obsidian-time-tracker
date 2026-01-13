@@ -12,7 +12,8 @@
 
 <button
 	type="button"
-	class="w-full rounded-lg overflow-hidden shadow-sm flex items-center transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer border-0 p-0 text-left bg-[--background-secondary]"
+	class="w-full rounded-lg overflow-hidden shadow-sm "
+	style="padding: 0; height: 100%; cursor: pointer;"
 	class:opacity-60={project.archived}
 	onclick={() => onEdit(project)}
 >
@@ -29,7 +30,7 @@
 		</div>
 		<div class="text-[11px] text-[--text-muted] truncate">
 			{categoryName}{#if project.archived}
-				· Archived{/if}
+				- Archived{/if}
 		</div>
 	</div>
 </button>

@@ -1,15 +1,9 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
 	import type { TimeRecord } from "../types";
-	import {
-		formatNaturalDuration,
-		getRecordDuration,
-	} from "../utils/timeUtils";
 	import { icon } from "../utils/styleUtils";
 	import { EditRecordModal } from "../modals/EditRecordModal";
-	import { CSVHandler } from "../utils/csvHandler";
-	import MiniTitle from "./MiniTitle.svelte";
-
+	
 	interface Props {
 		plugin: TimeTrackerPlugin;
 		onRefresh?: () => void;
@@ -43,16 +37,15 @@
 		<!-- <MiniTitle>
 			{recentRecords.length == 1 ? "Last Record" : "Last Records"}
 		</MiniTitle> -->
-		<div class="flex flex-col gap-1 mt-1">
+		<div class="flex flex-col gap-2 mt-1">
 			{#each recentRecords as record (record.id)}
 				{@const project = plugin.getProjectById(record.projectId)}
 				<div
-					class="flex items-center gap-0 rounded-lg p-0 border-2"
-					style="border-color: {project?.color || ""};"
+					class="flex justify-between items-center gap-0 rounded-lg p-0 m-0 "
 				>
 					<!-- project name and title -->
 					<div
-						class="flex-1 min-w-0 flex items-center gap-1 cursor-pointer"
+						class="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
 						onclick={() => handleEdit(record)}
 						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
 						role="button"
@@ -68,9 +61,11 @@
 							<div
 								class="rounded flex items-center justify-center pr-1"
 							>
-								<span
-									class="text-xs font-medium shrink-0 size-7 flex items-center justify-center"
-									>{project.icon}</span
+								<button
+									class="flex items-center justify-center rounded-lg mr-2"
+									style="background-color: {project.color}; cursor: pointer; font-size: 1rem; height: 2rem; width: 2rem;"
+									aria-label="Edit project"
+									>{project.icon}</button
 								>
 
 								<span class="text-xs font-medium shrink-0"
@@ -92,7 +87,7 @@
 						{/if}
 					</div>
 
-					<div class="text-xs text-(--text-normal) tabular-nums cursor-pointer pr-1"
+					<div class="text-xs text-(--text-normal) tabular-nums cursor-pointer pr-2"
 						onclick={() => handleEdit(record)}
 						onkeydown={(e) => e.key === "Enter" && handleEdit(record)}
 						role="button"
@@ -106,7 +101,7 @@
 					<!-- buttons -->
 					<button
 						class="size-10 rounded p-0"
-						style="cursor: pointer; margin: 4px"
+						style="cursor: pointer;"
 						aria-label="Repeat"
 						onclick={() => handleRepeat(record)}
 						{@attach icon("repeat")}
