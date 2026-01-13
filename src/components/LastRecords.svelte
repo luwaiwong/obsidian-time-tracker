@@ -26,7 +26,7 @@
 		plugin.timesheetData.records
 			.filter((r) => r.endTime !== null)
 			.sort((a, b) => b.endTime!.getTime() - a.endTime!.getTime())
-			.slice(0, maxRecords ?? plugin.settings.embeddedRecentRecordsCount ?? 3),
+			.slice(0, maxRecords ?? 3),
 	);
 
 	function handleRepeat(record: TimeRecord): void {

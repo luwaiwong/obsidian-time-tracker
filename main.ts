@@ -16,7 +16,6 @@ import type {
 	Project,
 	Timeblock,
 } from "./src/types";
-import { TimeTrackerCodeBlockProcessor } from "./src/codeBlockProcessor";
 import { ImportModal } from "./src/modals/ImportSTTModal";
 import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
@@ -34,7 +33,6 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	defaultTimeRange: "day",
 	customStartDate: Date.now(),
 	customEndDate: Date.now(),
-	embeddedRecentRecordsCount: 3,
 	sortMode: "color",
 	categoryFilter: [],
 	icsCalendars: [],
@@ -117,14 +115,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			name: "View Backups",
 			callback: () => new BackupViewerModal(this.app, this).open(),
 		});
-
-		this.registerMarkdownCodeBlockProcessor(
-			"time-tracker",
-			(source, el, ctx) => {
-				const processor = new TimeTrackerCodeBlockProcessor(this);
-				processor.process(source, el, ctx);
-			},
-		);
 
 		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
 

@@ -58,7 +58,6 @@ export interface PluginSettings {
 	defaultTimeRange: "day" | "week" | "month" | "year" | "custom";
 	customStartDate: number;
 	customEndDate: number;
-	embeddedRecentRecordsCount: number;
 	sortMode: "category" | "name" | "color" | "recent";
 	categoryFilter: number[];
 	icsCalendars: string[];

@@ -174,25 +174,6 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					),
 			);
 
-		// embedded tracker section
-		containerEl.createEl("h3", { text: "Embedded Tracker" });
-
-		new Setting(containerEl)
-			.setName("Recent logs count")
-			.setDesc(
-				"Number of recent time records to show in embedded trackers",
-			)
-			.addSlider((slider) =>
-				slider
-					.setLimits(1, 20, 1)
-					.setValue(this.plugin.settings.embeddedRecentRecordsCount)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						this.plugin.settings.embeddedRecentRecordsCount = value;
-						await this.refreshAndSavePlugin();
-					}),
-			);
-
 		// calendar integration section
 		containerEl.createEl("h3", { text: "Calendar Integration" });
 		new Setting(containerEl)
