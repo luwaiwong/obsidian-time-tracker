@@ -23,13 +23,13 @@ Big thanks to the Simple Time Tracker Android App, this plugin was greatly inspi
 - Filter by day, week, month, year, or custom range
 
 ### Schedule View
-- Daily calendar view of tracked time
+- Daily calendar view of tracked time, using [Full Calendar](https://github.com/fullcalendar/fullcalendar)
 - ICS calendar integration (Google Calendar, etc.)
-- Timeblocking in your schedule
+- Timeblocking, right in your sidebar
 
 ### Tracking Modes
-- **Standard** — Click to start, click to stop
-- **Retroactive** — Fills time gaps when switching projects
+- **Standard** - Click to start, click to stop
+- **Retroactive** - Fills time gaps when switching projects
 
 ### Data
 
