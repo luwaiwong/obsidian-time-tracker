@@ -1,16 +1,15 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
-import { CSVHandler } from "../csvHandler";
+import { CSVHandler } from "../utils/csvHandler";
 
-export class ProjectModal extends Modal {
+export class CreateProjectModal extends Modal {
 	plugin: TimeTrackerPlugin;
 	project: Project | null;
 	onSave: () => void;
 
 	private nameInput: string = "";
-	private iconInput: string = "";
-	private iconType: "emoji" | "text" = "emoji";
+	private iconInput: string = "🕐";
 	private colorInput: string = "#4ECDC4";
 	private categoryId: number = -1;
 
@@ -28,7 +27,6 @@ export class ProjectModal extends Modal {
 		if (project) {
 			this.nameInput = project.name;
 			this.iconInput = project.icon;
-			this.iconType = project.iconType;
 			this.colorInput = project.color;
 			this.categoryId = project.categoryId;
 		}
@@ -41,7 +39,6 @@ export class ProjectModal extends Modal {
 			text: this.project ? "Edit Project" : "New Project",
 		});
 
-		// Project Name
 		new Setting(contentEl)
 			.setName("Project Name")
 			.setDesc("The name of your project")
@@ -54,40 +51,18 @@ export class ProjectModal extends Modal {
 					}),
 			);
 
-		// Icon Type
-		new Setting(contentEl)
-			.setName("Icon Type")
-			.setDesc("Choose between emoji or text icon")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("emoji", "Emoji")
-					.addOption("text", "Text")
-					.setValue(this.iconType)
-					.onChange((value: "emoji" | "text") => {
-						this.iconType = value;
-						this.contentEl.empty();
-						this.onOpen();
-					}),
-			);
-
-		// Icon
 		new Setting(contentEl)
 			.setName("Icon")
-			.setDesc(
-				this.iconType === "emoji"
-					? "Enter an emoji (e.g., 📚)"
-					: "Enter text (e.g., MAT, 301)",
-			)
+			.setDesc("Enter an emoji or text (e.g., 📚, MAT, 301)")
 			.addText((text) =>
 				text
-					.setPlaceholder(this.iconType === "emoji" ? "📚" : "MAT")
+					.setPlaceholder("📚")
 					.setValue(this.iconInput)
 					.onChange((value) => {
 						this.iconInput = value;
 					}),
 			);
 
-		// Color
 		new Setting(contentEl)
 			.setName("Color")
 			.setDesc("Pick a color for this project")
@@ -97,14 +72,13 @@ export class ProjectModal extends Modal {
 				}),
 			);
 
-		// Category
 		new Setting(contentEl)
 			.setName("Category")
 			.setDesc("Assign to a category (optional)")
 			.addDropdown((dropdown) => {
 				dropdown.addOption("-1", "Uncategorized");
 				for (const category of this.plugin.timesheetData.categories) {
-					if (category.id !== -1) {
+					if (category.id !== 1) {
 						dropdown.addOption(String(category.id), category.name);
 					}
 				}
@@ -114,7 +88,6 @@ export class ProjectModal extends Modal {
 				});
 			});
 
-		// Buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
 		buttonContainer.style.display = "flex";
 		buttonContainer.style.justifyContent = "flex-end";
@@ -150,36 +123,26 @@ export class ProjectModal extends Modal {
 
 	async save() {
 		if (!this.nameInput.trim() || !this.iconInput.trim()) {
-			// Show error notification
 			new Notice("Please enter both project name and icon");
 			return;
 		}
 
 		if (this.project) {
-			// Update existing project
-			this.project.name = this.nameInput.trim();
+			const oldName = this.project.name;
+			const newName = this.nameInput.trim();
+
+			this.project.name = newName;
 			this.project.icon = this.iconInput.trim();
-			this.project.iconType = this.iconType;
 			this.project.color = this.colorInput;
 			this.project.categoryId = this.categoryId;
-
-			// Update category mapping
-			if (this.categoryId !== -1) {
-				this.plugin.timesheetData.projectCategories.set(
-					this.project.id,
-					this.categoryId,
-				);
-			} else {
-				this.plugin.timesheetData.projectCategories.delete(this.project.id);
-			}
 		} else {
-			// Create new project
-			const newId = CSVHandler.getNextId(this.plugin.timesheetData.projects);
+			const newId = CSVHandler.getNextId(
+				this.plugin.timesheetData.projects,
+			);
 			const newProject: Project = {
 				id: newId,
 				name: this.nameInput.trim(),
 				icon: this.iconInput.trim(),
-				iconType: this.iconType,
 				color: this.colorInput,
 				categoryId: this.categoryId,
 				archived: false,
@@ -187,10 +150,6 @@ export class ProjectModal extends Modal {
 			};
 
 			this.plugin.timesheetData.projects.push(newProject);
-
-			if (this.categoryId !== -1) {
-				this.plugin.timesheetData.projectCategories.set(newId, this.categoryId);
-			}
 		}
 
 		await this.plugin.saveTimesheet();

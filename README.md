@@ -1,104 +1,97 @@
-# obsidian time tracker
+# Time Tracker for Obsidian
 
-### development
+A **fully-featured**, time tracking plugin built into Obsidian. Track your work, analyze your productivity, and block out your time, all built in.
 
-setup
-- clone repo
-- in your test vault, create the folder `{vault-path}/.obsidian/plugins/obsidian-time-tracker`
-- copy `manifest.json` to the `{vault-path}/.obsidian/plugins/obsidian-time-tracker`
-- in `vite.config.ts` set DEV_DIRECTORY to your test vault path
+Big thanks to the Simple Time Tracker Android App, this plugin was greatly inspired by it.
 
+![Obsidian](https://img.shields.io/badge/Obsidian-7C3AED?style=for-the-badge&logo=obsidian&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte_5-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 
+---
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+## Features
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+### Time Tracking
+- Create projects with custom icons and colors
+- Organize projects in categories
+- One-click start/stop from sidebar
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+### Analytics
+- Pie charts by project or category
+- Timeline graphs over time
+- Filter by day, week, month, year, or custom range
 
-## First time developing plugins?
+### Schedule View
+- Daily calendar view of tracked time, using [Full Calendar](https://github.com/fullcalendar/fullcalendar)
+- ICS calendar integration (Google Calendar, etc.)
+- Timeblocking, right in your sidebar
 
-Quick starting guide for new plugin devs:
+### Tracking Modes
+- **Standard** - Click to start, click to stop
+- **Retroactive** - Fills time gaps when switching projects
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### Data
 
-## Releasing new releases
+All data are stored as CSV files *in your vault*
+- Auto-backup every 3 hours
+- Conflict resolution for sync issues
+- Import from Simple Time Tracker
+- Mobile support
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+### Commands
+| Command | Description |
+|---------|-------------|
+| Open Time Tracker | Open sidebar |
+| Open Analytics | Open analytics |
+| Toggle Last Used Timer | Start/stop last project |
+| View Backups | Browse backups |
+| Resolve Conflicts | Fix sync conflicts |
+| Import from Simple Time Tracker | Import STT data |
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+---
 
-## Adding your plugin to the community plugin list
+## Installation
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### BRAT
+1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat)
+2. Add beta plugin: `https://github.com/luwaiwong/obsidian-time-tracker`
+3. Enable in settings
 
-## How to use
+### Manual
+1. Download from [Releases](https://github.com/luwaiwong/obsidian-time-tracker/releases)
+2. Extract to `{vault}/.obsidian/plugins/time-tracker/`
+3. Enable in settings
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+---
 
-## Manually installing the plugin
+## Development
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+```bash
+git clone git@github.com:luwaiwong/obsidian-time-tracker.git
+cd obsidian-time-tracker
+npm install
 ```
 
-If you have multiple URLs, you can also do:
+Set `DEV_DIRECTORY` in `vite.config.ts` to your test vault.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+```bash
+npm run dev      # watch mode
+npm run build    # production build
+npm run check    # type check
+npm run lint     # lint
+npm run format   # format
 ```
 
-## API Documentation
+---
 
-See https://github.com/obsidianmd/obsidian-api
+## Support
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/luwaiwong)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/luwaiwong)
+
+---
+
+## License
+
+GPL-3.0 © [Lu-Wai Wong](https://github.com/luwaiwong)

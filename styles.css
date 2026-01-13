@@ -8,3 +8,136 @@ If your plugin does not need CSS, delete this file.
 */
 
 @import "tailwindcss";
+
+/* View container */
+.view-content.time-tracker-view {
+	padding: 0;
+}
+.time-tracker-view {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+	padding: 0;
+}
+
+.time-tracker-header {
+	flex-shrink: 0;
+}
+
+.time-tracker-content {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* Loading and error states */
+.time-tracker-loading,
+.time-tracker-error {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+	text-align: center;
+	min-height: 200px;
+	font-size: var(--font-ui-medium);
+}
+
+.time-tracker-error {
+	color: var(--text-error);
+}
+
+/* Last Records Section */
+.last-record-repeat-btn,
+.last-record-edit-btn {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Project Selector Modal */
+.project-selector-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	margin-top: 16px;
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.project-selector-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 12px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	transition:
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
+	color: white;
+}
+
+.project-selector-btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.project-selector-create {
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
+	border: 1px dashed var(--background-modifier-border);
+}
+
+.project-selector-icon {
+	font-size: 1.25rem;
+}
+
+.project-selector-name {
+	font-size: 0.75rem;
+	text-align: center;
+	word-break: break-word;
+}
+
+/* Edit Record Modal */
+.modal.edit-record-modal,
+.modal.create-record-modal {
+	max-width: 100%;
+	position: relative;
+}
+
+.modal.edit-record-modal > .modal-close-button,
+.modal.create-record-modal > .modal-close-button {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	margin: 0;
+}
+
+.modal.edit-record-modal > .modal-content,
+.modal.create-record-modal > .modal-content {
+	padding: 20px;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.edit-record-modal .retroactive-info,
+.create-record-modal .retroactive-info {
+	margin-bottom: 12px;
+	padding: 8px 12px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+}
+
+.edit-record-modal .project-grid-label,
+.create-record-modal .project-grid-label {
+	margin-top: 16px;
+	margin-bottom: 8px;
+	font-weight: 500;
+}

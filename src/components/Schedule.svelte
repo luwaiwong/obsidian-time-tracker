@@ -1,476 +1,826 @@
 <script lang="ts">
-import type TimeTrackerPlugin from "../../main";
-import type { Project } from "../types";
-import { formatDuration } from "../utils";
+	import type TimeTrackerPlugin from "../../main";
+	import type { Project, TimeRecord, Timeblock } from "../types";
+	import { formatNaturalDuration } from "../utils/timeUtils";
+	import { icon, yieldToMain } from "../utils/styleUtils";
+	import { Calendar } from "@fullcalendar/core";
+	import timeGridPlugin from "@fullcalendar/timegrid";
+	import interactionPlugin from "@fullcalendar/interaction";
+	import { onMount, onDestroy } from "svelte";
+	import { IcsEventModal } from "../modals/IcsEventModal";
+	import { CreateTimeblockModal } from "../modals/CreateTimeblockModal";
+	import { EditTimeblockModal } from "../modals/EditTimeblockModal";
+	import { Notice } from "obsidian";
+	import { fetchIcsCalendars } from "../utils/icsHandler";
 
-interface Props {
-	plugin: TimeTrackerPlugin;
-}
+	interface Props {
+		plugin: TimeTrackerPlugin;
+		onRefresh: () => void;
+		onOpenAnalytics: () => void;
+		onOpenSettings: () => void;
+		onEditRecord: (record: TimeRecord, project: Project) => void;
+	}
 
-type ScheduleBlock = {
-	key: string;
-	project: Project;
-	start: number;
-	end: number;
-	duration: number;
-	top: number;
-	height: number;
-	isRunning: boolean;
-};
+	let { plugin, onRefresh, onOpenAnalytics, onOpenSettings, onEditRecord }: Props =
+		$props();
 
-const HOURS = Array.from({ length: 25 }, (_, i) => i); // 0:00 through 24:00 guide lines
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MIN_BLOCK_HEIGHT_PERCENT = 1;
+	let calendarEl: HTMLDivElement;
+	let calendar: Calendar | null = null;
+	let selectedDate = $state(new Date());
+	let now = $state(Date.now());
+	let interval: number | undefined;
+	let projects = $derived(plugin.timesheetData?.projects ?? []);
+	let records = $derived(plugin.timesheetData?.records ?? []);
+	let timeblocks = $derived(plugin.timeblocksData?.timeblocks ?? []);
 
-let { plugin }: Props = $props();
-let selectedDate = $state(new Date());
-let now = $state(Date.now());
-let interval: number | undefined;
-let projects = $derived(plugin.timesheetData?.projects ?? []);
-let records = $derived(plugin.timesheetData?.records ?? []);
+	let icsEvents = $state<any[]>(plugin.icsCache.events);
+	let icsLoading = $state(false);
+	let zoomLevel = $state(plugin.settings.scheduleZoom);
+	let isUpdatingCalendar = false;
+	let pendingCalendarUpdate = false;
 
-$effect(() => {
-	if (interval) clearInterval(interval);
-	interval = window.setInterval(() => {
-		now = Date.now();
-	}, 1000 * 30);
+	const ZOOM_LEVELS = [15, 30, 60, 120];
 
-	return () => {
-		if (interval) clearInterval(interval);
-	};
-});
+	// interval setup moved to onMount to prevent recreation on every render
 
-function moveDay(delta: number) {
-	const next = new Date(selectedDate);
-	next.setDate(next.getDate() + delta);
-	selectedDate = next;
-}
+	async function refresh() {
+		await fetchIcsEvents(true);
+		await onRefresh();
+	}
 
-function setToday() {
-	selectedDate = new Date();
-}
+	function moveDay(delta: number) {
+		const next = new Date(selectedDate);
+		next.setDate(next.getDate() + delta);
+		selectedDate = next;
+		if (calendar) {
+			calendar.gotoDate(next);
+		}
+	}
 
-function getDayRange(date: Date) {
-	const start = new Date(date);
-	start.setHours(0, 0, 0, 0);
-	const end = new Date(date);
-	end.setHours(23, 59, 59, 999);
-	return { start: start.getTime(), end: end.getTime() };
-}
+	function setToday() {
+		selectedDate = new Date();
+		if (calendar) {
+			calendar.gotoDate(selectedDate);
+		}
+	}
 
-function formatTimeOfDay(timestamp: number) {
-	return new Date(timestamp).toLocaleTimeString([], {
-		hour: "2-digit",
-		minute: "2-digit",
+	function zoomIn() {
+		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+		if (idx > 0) {
+			zoomLevel = ZOOM_LEVELS[idx - 1];
+			applyZoom();
+		}
+	}
+
+	function zoomOut() {
+		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+		if (idx < ZOOM_LEVELS.length - 1) {
+			zoomLevel = ZOOM_LEVELS[idx + 1];
+			applyZoom();
+		}
+	}
+
+	function applyZoom() {
+		if (calendar) {
+			const duration = `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`;
+			const snapDuration = `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`;
+			calendar.setOption("slotDuration", duration);
+			calendar.setOption("slotLabelInterval", duration);
+			calendar.setOption("snapDuration", snapDuration);
+		}
+		plugin.settings.scheduleZoom = zoomLevel;
+		plugin.saveSettings();
+	}
+
+	function getDayRange(date: Date) {
+		const start = new Date(date);
+		start.setHours(0, 0, 0, 0);
+		const end = new Date(date);
+		end.setHours(23, 59, 59, 999);
+		return { start: start.getTime(), end: end.getTime() };
+	}
+
+	function buildCalendarEvents() {
+		const events: any[] = [];
+		const { start, end } = getDayRange(selectedDate);
+
+		// Process completed records
+		for (const record of records) {
+			if (record.endTime === null) continue;
+			const recordStart = record.startTime.getTime();
+			const recordEnd = record.endTime.getTime();
+			if (recordEnd < start || recordStart > end) continue;
+
+			const project = plugin.getProjectById(record.projectId);
+			if (!project) continue;
+
+			const clampedStart = Math.max(recordStart, start);
+			const clampedEnd = Math.min(recordEnd, end);
+
+			events.push({
+				id: `${record.id}`,
+				title: `${project.icon} ${project.name}`,
+				start: new Date(clampedStart),
+				end: new Date(clampedEnd),
+				backgroundColor: project.color,
+				borderColor: "grey",
+				extendedProps: {
+					project,
+					duration: clampedEnd - clampedStart,
+					isRunning: false,
+					record: record,
+				},
+			});
+		}
+
+		// Process running timers
+		for (const timer of plugin.runningTimers || []) {
+			const timerStart = timer.startTime.getTime();
+			if (timerStart > end) continue;
+
+			const project = plugin.getProjectById(timer.projectId);
+			if (!project) continue;
+
+			const clampedStart = Math.max(timerStart, start);
+			const clampedEnd = Math.min(now, end);
+
+			events.push({
+				id: `running-${timer.projectId}`,
+				title: `${project.icon} ${project.name} (Running)`,
+				start: new Date(clampedStart),
+				end: new Date(clampedEnd),
+				backgroundColor: project.color,
+				borderColor: project.color,
+				extendedProps: {
+					project,
+					duration: clampedEnd - clampedStart,
+					isRunning: true,
+					record: timer,
+				},
+			});
+		}
+
+		// process timeblocks (only if enabled)
+		if (!plugin.settings.enableTimeblocking) return events;
+		for (const timeblock of timeblocks) {
+			const tbStart = timeblock.startTime.getTime();
+			const tbEnd = timeblock.endTime.getTime();
+			if (tbEnd < start || tbStart > end) continue;
+
+			const clampedStart = new Date(Math.max(tbStart, start));
+			const clampedEnd = new Date(Math.min(tbEnd, end));
+
+			events.push(buildTimeblockEvent(timeblock, clampedStart, clampedEnd));
+		}
+
+		return events;
+	}
+
+	function buildTimeblockEvent(timeblock: Timeblock, start?: Date, end?: Date) {
+		const color = timeblock.color;
+		const eventStart = start ?? timeblock.startTime;
+		const eventEnd = end ?? timeblock.endTime;
+		return {
+			id: `timeblock-${timeblock.id}`,
+			title: timeblock.title,
+			start: eventStart,
+			end: eventEnd,
+			backgroundColor: `${color}80`,
+			borderColor: color,
+			classNames: ["timeblock-event"],
+			editable: true,
+			durationEditable: true,
+			extendedProps: {
+				isTimeblock: true,
+				timeblock: timeblock,
+				color: color,
+				duration: eventEnd.getTime() - eventStart.getTime(),
+			},
+		};
+	}
+
+	function addTimeblockToCalendar(timeblock: Timeblock) {
+		if (!calendar || !plugin.settings.enableTimeblocking) return;
+		calendar.addEvent(buildTimeblockEvent(timeblock));
+	}
+
+	function updateTimeblockOnCalendar(timeblock: Timeblock) {
+		if (!calendar || !plugin.settings.enableTimeblocking) return;
+		const event = calendar.getEventById(`timeblock-${timeblock.id}`);
+		if (event) {
+			event.remove();
+		}
+		addTimeblockToCalendar(timeblock);
+	}
+
+	function removeTimeblockFromCalendar(id: number) {
+		if (!calendar) return;
+		const event = calendar.getEventById(`timeblock-${id}`);
+		if (event) {
+			event.remove();
+		}
+	}
+
+
+	async function fetchIcsEvents(force = false) {
+		console.log("fetching ICS events", force);
+		if (force) {
+			// reset stuck loading state and allow re-fetch
+			plugin.icsCache.fetched = false;
+			plugin.icsCache.loading = false;
+		}
+
+		if (plugin.icsCache.fetched) {
+			return;
+		}
+		if (plugin.icsCache.loading) {
+			return; // prevent concurrent fetches
+		}
+
+		icsLoading = true;
+		await fetchIcsCalendars(plugin);
+		console.log("finshed fetching ICS events", plugin.icsCache.events.length);
+		icsEvents = plugin.icsCache.events;
+		icsLoading = false;
+		await updateCalendarEvents();
+	}
+
+	function reloadIcsCalendars() {
+		fetchIcsEvents(true);
+	}
+
+	async function updateCalendarEvents() {
+		console.log("updating calendar events");
+		if (!calendar) return;
+		if (isUpdatingCalendar) {
+			pendingCalendarUpdate = true;
+			return;
+		}
+
+		isUpdatingCalendar = true;
+		pendingCalendarUpdate = false;
+
+		try {
+			const trackerEvents = buildCalendarEvents();
+			const allEvents = [...trackerEvents, ...icsEvents];
+			const currentEvents = calendar.getEvents();
+
+			// more efficient lookups
+			const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
+			const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
+
+			// collect events to add
+			const eventsToAdd: any[] = [];
+			for (const newEvent of allEvents) {
+				const existing = currentEventsMap.get(newEvent.id);
+				if (existing) {
+					if (newEvent.extendedProps?.isRunning) {
+						existing.setEnd(newEvent.end);
+					}
+				} else {
+					eventsToAdd.push(newEvent);
+				}
+			}
+
+			// add events in chunks to avoid blocking UI
+			const CHUNK_SIZE = 10;
+			for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
+				const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
+				for (const event of chunk) {
+					calendar.addEvent(event);
+				}
+				if (i + CHUNK_SIZE < eventsToAdd.length) {
+					await yieldToMain();
+				}
+			}
+
+			// remove events that no longer exist
+			for (const existing of currentEvents) {
+				if (!allEventsMap.has(existing.id)) {
+					existing.remove();
+				}
+			}
+		} finally {
+			isUpdatingCalendar = false;
+			// if another update was requested while we were busy, run it now
+			if (pendingCalendarUpdate) {
+				pendingCalendarUpdate = false;
+				updateCalendarEvents();
+			}
+		}
+	}
+
+	let resizeObserver: ResizeObserver | null = null;
+
+	function getCurrentScrollTime(): string {
+		const now = new Date();
+		const hours = now.getHours();
+		// scroll to current time, clamped to 23:00 + scroll offset
+
+		const scrollHour = Math.max(0, hours - 1);
+		return `${String(scrollHour).padStart(2, "0")}:00:00`;
+	}
+
+	onMount(() => {
+		calendar = new Calendar(calendarEl, {
+			plugins: [timeGridPlugin, interactionPlugin],
+			initialView: "timeGridDay",
+			initialDate: selectedDate,
+			headerToolbar: false,
+			height: "100%",
+			slotMinTime: "00:00:00",
+			slotMaxTime: "24:00:00",
+			slotDuration: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+			slotLabelInterval: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+			snapDuration: `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`,
+			allDaySlot: false,
+			nowIndicator: true,
+			scrollTime: getCurrentScrollTime(),
+			slotLabelFormat: {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			},
+			eventTimeFormat: {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			},
+			dayHeaderFormat: {
+				weekday: "long",
+				month: "long",
+				day: "numeric",
+				year: "numeric",
+			},
+			eventMinHeight: 0,
+			eventShortHeight: 100000,
+			events: [...buildCalendarEvents(), ...icsEvents],
+			dateClick(arg) {
+				if (!plugin.settings.enableTimeblocking) return;
+				const startDate = arg.date;
+				const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+				new CreateTimeblockModal(
+					plugin.app,
+					plugin,
+					startDate,
+					endDate,
+					(timeblock) => addTimeblockToCalendar(timeblock),
+				).open();
+			},
+			eventClick: (info) => {
+				const props = info.event.extendedProps;
+				if (props?.isIcs) {
+					new IcsEventModal(plugin.app, {
+						title: info.event.title,
+						start: info.event.start,
+						end: info.event.end,
+						description: props.description,
+						location: props.location,
+						url: props.url,
+						color: props.color,
+						sourceName: props.sourceName,
+					}).open();
+				} else if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) return;
+					const currentTimeblock = plugin.getTimeblockById(props.timeblock.id);
+					if (!currentTimeblock) return;
+					new EditTimeblockModal(
+						plugin.app,
+						plugin,
+						currentTimeblock,
+						(updated: Timeblock) => updateTimeblockOnCalendar(updated),
+						(id: number) => removeTimeblockFromCalendar(id),
+					).open();
+				} else if (props?.project && props?.record) {
+					onEditRecord(props.record, props.project);
+				}
+			},
+			eventDrop: async (info) => {
+				const props = info.event.extendedProps;
+				if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) {
+						info.revert();
+						return;
+					}
+					
+					// snap snart to the nearest slot
+					const slotDuration = zoomLevel * 60 * 1000;
+					const startTime = new Date(info.event.start!);
+					startTime.setMinutes(Math.floor(startTime.getMinutes() / slotDuration) * slotDuration);
+
+					info.event.setStart(startTime);					
+					await plugin.updateTimeblock(props.timeblock.id, {
+						startTime: startTime,
+						endTime: info.event.end!,
+					});
+				} else {
+					info.revert();
+				}
+			},
+			eventResize: async (info) => {
+				const props = info.event.extendedProps;
+				if (props?.isTimeblock && props?.timeblock) {
+					if (!plugin.settings.enableTimeblocking) {
+						info.revert();
+						return;
+					}
+					await plugin.updateTimeblock(props.timeblock.id, {
+						startTime: info.event.start!,
+						endTime: info.event.end!,
+					});
+				} else {
+					info.revert();
+				}
+			},
+			eventContent: (arg) => {
+				const props = arg.event.extendedProps;
+				let duration = props?.duration || null;
+
+				// calculate duration if not provided
+				if (duration == null) {
+					const start = arg.event.start;
+					const end = arg.event.end;
+					if (start && end) {
+						duration = end.getTime() - start.getTime();
+					} else {
+						duration = 0;
+					}
+				}
+
+				// thresholds based on zoom level (in ms)
+				const slotMs = zoomLevel * 60 * 1000;
+				const minimizeThreshold = slotMs / 2; // minimize if less than half a slot
+				const compactThreshold = slotMs * 1.5; // compact if less than 1.5 slots
+
+				// ics events
+				if (props?.isIcs) {
+					if (duration != 0 && duration < compactThreshold) {
+						return {
+							html: `
+								<div class="flex flex-col justify-center p-0 pl-1 w-full h-full overflow-hidden">
+									${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
+									<div class="flex flex-row gap-1 justify-start items-center whitespace-nowrap">
+										<div class="font-bold text-sm shrink-0">${arg.event.title}:</div>
+										<div class="text-sm opacity-95 truncate">${arg.timeText}</div>
+									</div>
+								</div>
+							`,
+						};
+					}
+
+					return {
+						html: `
+							<div class="flex flex-column gap-0.5 justify-start items-start p-0 pl-1 w-full h-full"
+							style="flex-direction: column;">
+								${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
+								<div class="font-bold text-sm">${arg.event.title} </div>
+								<div class="text-sm opacity-95">${arg.timeText}</div>
+							</div>
+						`,
+					};
+				} else if (props?.isTimeblock) {
+					// timeblock events
+					const color = props.color || "#6b7280";
+					const notes = props.timeblock?.notes;
+
+					if (duration < minimizeThreshold) {
+						return {
+							html: `
+								<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
+									<div class="font-bold text-sm truncate mt-0">${arg.event.title}</div>
+								</div>
+							`,
+						};
+					}
+
+					let notesHtml = "";
+					if (notes) {
+						const formattedNotes = notes.replace(/\n/g, "<br>");
+						notesHtml = `<div class="text-xs opacity-70 mt-0 overflow-hidden">${formattedNotes}</div>`;
+					}
+
+					return {
+						html: `
+							<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
+								<div class="font-bold text-sm mt-0">${arg.event.title}</div>
+								${notesHtml}
+							</div>
+						`,
+					};
+				} else {
+					// time tracker events - minimize if less than threshold
+					if (duration < minimizeThreshold) {
+						return {
+							html: `<div class="flex flex-col gap-0.5"></div>`,
+						};
+					}
+
+					// time tracker events - compact view
+					if (duration < compactThreshold) {
+						return {
+							html: `
+								<div class="flex flex-row gap-1 justify-start items-center p-0 w-full"
+								style="padding: 0;">
+									<div class="font-bold text-sm">${arg.event.title}: </div>
+									<div class="text-sm opacity-95">${formatNaturalDuration(duration)}</div>
+								</div>
+							`,
+						};
+					}
+					// time tracker events - full view
+					return {
+						html: `
+							<div class="flex flex-column justify-start items-center p-0 w-full"
+							style="flex-direction: column; align-items: flex-start;">
+								<div class="font-bold text-sm">${arg.event.title} </div>
+								<div class="text-sm opacity-95">${formatNaturalDuration(duration)}</div>
+								<div class="text-sm opacity-95">${arg.timeText}</div>
+							</div>
+						`,
+					};
+				}
+
+			},
+		});
+		calendar.render();
+
+		// restore scroll position if available
+		if (plugin.scheduleState.scrollTop > 0) {
+			const scroller = calendarEl.querySelector(".fc-scroller-liquid-absolute");
+			if (scroller) {
+				scroller.scrollTop = plugin.scheduleState.scrollTop;
+			}
+		}
+
+		// fetch ICS if not already cached (events already included in initial render if cached)
+		if (!plugin.icsCache.fetched) {
+			fetchIcsEvents(true);
+		}
+
+		// update time every 30s for running timers (effect handles calendar update via `now` dependency)
+		interval = window.setInterval(() => {
+			now = Date.now();
+		}, 1000 * 30);
+
+		// watch for container resize to update calendar dimensions
+		resizeObserver = new ResizeObserver(() => {
+			if (calendar) {
+				calendar.updateSize();
+			}
+		});
+		resizeObserver.observe(calendarEl);
 	});
-}
 
-function buildBlock(
-	key: string,
-	project: Project,
-	start: number,
-	end: number,
-	isRunning: boolean,
-	dayStart: number,
-	dayLength: number,
-): ScheduleBlock {
-	const duration = Math.max(end - start, 0);
-	const top = ((start - dayStart) / dayLength) * 100;
-	const height = Math.max((duration / dayLength) * 100, MIN_BLOCK_HEIGHT_PERCENT);
+	onDestroy(() => {
+		// save scroll position before destroy
+		const scroller = calendarEl?.querySelector(".fc-scroller-liquid-absolute");
+		if (scroller) {
+			plugin.scheduleState.scrollTop = scroller.scrollTop;
+		}
 
-	return {
-		key,
-		project,
-		start,
-		end,
-		duration,
-		top,
-		height,
-		isRunning,
-	};
-}
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+		}
+		if (calendar) {
+			calendar.destroy();
+		}
+		if (interval) {
+			clearInterval(interval);
+		}
+	});
 
-let dayRange = $derived(getDayRange(selectedDate));
-let dayLength = $derived(dayRange.end - dayRange.start);
-
-let blocks: ScheduleBlock[] = $derived.by(() => {
-	const { start, end } = dayRange;
-	const items: ScheduleBlock[] = [];
-	if (dayLength <= 0 || projects.length === 0) return items;
-
-	for (const record of records) {
-		if (record.endTime < start || record.startTime > end) continue;
-		const project = projects.find((p) => p.id === record.projectId);
-		if (!project) continue;
-
-		const clampedStart = Math.max(record.startTime, start);
-		const clampedEnd = Math.min(record.endTime, end);
-
-		items.push(
-			buildBlock(
-				`record-${record.id}`,
-				project,
-				clampedStart,
-				clampedEnd,
-				false,
-				start,
-				dayLength,
-			),
-		);
-	}
-
-	for (const timer of plugin.runningTimers || []) {
-		if (timer.startTime > end) continue;
-		const project = projects.find((p) => p.id === timer.projectId);
-		if (!project) continue;
-		const clampedStart = Math.max(timer.startTime, start);
-		const clampedEnd = Math.min(now, end);
-
-		items.push(
-			buildBlock(
-				`running-${timer.projectId}`,
-				project,
-				clampedStart,
-				clampedEnd,
-				true,
-				start,
-				dayLength,
-			),
-		);
-	}
-
-	return items
-		.filter((block) => block.height > 0)
-		.sort((a, b) => a.start - b.start);
-});
-
-let totalDayDuration = $derived(
-	blocks.reduce((total, block) => total + block.duration, 0),
-);
-
-function getNowMarkerPosition() {
-	if (!isSameDay(selectedDate, now)) return null;
-	const { start } = dayRange;
-	const position = ((now - start) / DAY_MS) * 100;
-	if (position < 0 || position > 100) return null;
-	return position;
-}
-
-function isSameDay(date: Date, timestamp: number) {
-	const check = new Date(timestamp);
-	return (
-		date.getFullYear() === check.getFullYear() &&
-		date.getMonth() === check.getMonth() &&
-		date.getDate() === check.getDate()
-	);
-}
-
-let nowPosition = $derived(getNowMarkerPosition());
-
-let selectedDateLabel = $derived(
-	selectedDate.toLocaleDateString(undefined, {
-		weekday: "long",
-		month: "short",
-		day: "numeric",
-	}),
-);
+	// Update events when data changes
+	$effect(() => {
+		// track dependencies
+		projects;
+		records;
+		timeblocks;
+		selectedDate;
+		icsEvents;
+		now;
+		plugin.settings.enableTimeblocking;
+		updateCalendarEvents();
+	});
 </script>
 
-<div class="schedule">
-    <div class="schedule-header">
-        <div class="date-controls">
-            <button class="ghost" onclick={() => moveDay(-1)}>‹</button>
-            <button class="solid" onclick={setToday}>Today</button>
-            <button class="ghost" onclick={() => moveDay(1)}>›</button>
-            <div class="date-label">{selectedDateLabel}</div>
-        </div>
-        <div class="day-summary">
-            <span>Total {formatDuration(totalDayDuration, true)}</span>
-            <span class="divider">•</span>
-            <span>{blocks.length} {blocks.length === 1 ? "block" : "blocks"}</span>
-        </div>
-    </div>
+<div class="flex flex-col gap-3 h-full w-full p-3 box-border overflow-hidden">
+	<div class="flex justify-between items-center gap-1 w-full">
+		<div class=" flex justify-center items-center gap-1">
+			<button
+				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 4px"
+				onclick={() => moveDay(-1)}
+				aria-label="Previous day"
+				{@attach icon("chevron-left")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 6px"
+				onclick={setToday}
+				aria-label="Go to today"
+				{@attach icon("calendar-check")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="cursor: pointer; padding: 4px"
+				onclick={() => moveDay(1)}
+				aria-label="Next day"
+				{@attach icon("chevron-right")}
+			></button>
+		</div>
+		<div class="flex justify-end items-center gap-1">	
 
-    <div class="schedule-body">
-        <div class="time-axis">
-            {#each HOURS as hour (hour)}
-                <div class="axis-row">
-                    <span class="axis-label">{String(hour).padStart(2, "0")}:00</span>
-                </div>
-            {/each}
-        </div>
+			<button
+				class="shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 6px;
+					margin: 0;
+					cursor: pointer;
 
-        <div class="schedule-canvas">
-            {#each HOURS as hour (hour)}
-                <div
-                    class="hour-line"
-                    style={`top: ${(hour / 24) * 100}%;`}
-                ></div>
-            {/each}
+				"
+				aria-label="Zoom out"
+				onclick={zoomOut}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === ZOOM_LEVELS.length - 1}
+				{@attach icon("zoom-out")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				aria-label="Zoom in"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 6px;
+					margin: 0;
+					cursor: pointer;
 
-            {#if nowPosition !== null}
-                <div class="now-line" style={`top: ${nowPosition}%;`}>
-                    <span>Now</span>
-                </div>
-            {/if}
+				"
+				onclick={zoomIn}
+				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
+				{@attach icon("zoom-in")}
+			></button>
+			<button
+				class="bg-transparent shrink-0 {icsLoading ? 'ics-loading' : ''}"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 6px;
+					margin: 0;
+					cursor: pointer;
 
-            {#each blocks as block (block.key)}
-                <div
-                    class="time-block"
-                    style={`top: ${block.top}%; height: ${block.height}%; background-color: ${block.project.color};`}
-                >
-                    <div class="block-content">
-                        <div class="block-title">
-                            <span class="block-icon">{block.project.icon}</span>
-                            <span class="block-name">{block.project.name}</span>
-                        </div>
-                        <div class="block-times">
-                            {formatTimeOfDay(block.start)} - {formatTimeOfDay(block.end)}
-                        </div>
-                        <div class="block-duration">
-                            {block.isRunning ? "Running • " : ""}{formatDuration(block.duration, true)}
-                        </div>
-                    </div>
-                </div>
-            {/each}
+				"
+				aria-label="Refresh"
+				onclick={refresh}
+				{@attach icon("refresh-ccw")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 6px;
+					margin: 0;
+					cursor: pointer;
 
-            {#if blocks.length === 0}
-                <div class="empty-state">
-                    <p>No entries for this day.</p>
-                </div>
-            {/if}
-        </div>
-    </div>
+				"
+				aria-label="Open Analytics"
+				onclick={onOpenAnalytics}
+				{@attach icon("bar-chart-2")}
+			></button>
+			<button
+				class="bg-transparent shrink-0"
+				style="
+					background-color: transparent;
+					border: none;
+					padding: 6px;
+					margin: 0;
+					cursor: pointer;
+
+				"
+				aria-label="Open Settings"
+				onclick={onOpenSettings}
+				{@attach icon("settings")}
+			></button>
+		</div>
+	</div>
+
+	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>
 </div>
 
 <style>
-    .schedule {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        height: 100%;
-        padding: 12px;
-        box-sizing: border-box;
-    }
+	/* FullCalendar customization */
+	:global(.fc) {
+		height: 100%;
+		font-family: var(--font-interface);
+	}
 
-    .schedule-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-    }
+	:global(.fc .fc-timegrid-slot) {
+		height: 48px;
+	}
 
-    .date-controls {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+	:global(.fc .fc-timegrid-slot-label) {
+		color: var(--text-muted);
+		font-size: 0.85em;
+	}
 
-    .date-label {
-        font-weight: 700;
-        font-size: 1em;
-        color: var(--text-normal);
-        margin-left: 8px;
-    }
+	:global(.fc .fc-timegrid-divider) {
+		display: none;
+	}
 
-    .day-summary {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--text-muted);
-        font-weight: 600;
-    }
+	:global(.fc .fc-scrollgrid) {
+		border-color: var(--background-modifier-border);
+	}
 
-    .day-summary .divider {
-        opacity: 0.6;
-    }
+	:global(.fc .fc-scrollgrid td) {
+		border-color: var(--background-modifier-border);
+	}
 
-    .schedule-body {
-        display: flex;
-        gap: 12px;
-        align-items: stretch;
-    }
+	:global(.fc .fc-timegrid-axis) {
+		background: var(--background-primary);
+	}
 
-    .time-axis {
-        width: 70px;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-    }
+	:global(.fc .fc-timegrid-slot-lane) {
+		background: var(--background-secondary);
+	}
 
-    .axis-row {
-        height: 48px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        padding-right: 8px;
-        box-sizing: border-box;
-        color: var(--text-muted);
-        font-size: 0.85em;
-    }
+	:global(.fc .fc-col-header-cell) {
+		background: var(--background-primary);
+		color: var(--text-normal);
+		font-weight: 600;
+	}
 
-    .schedule-canvas {
-        position: relative;
-        flex: 1;
-        min-height: 1152px;
-        background: var(--background-secondary);
-        border: 1px solid var(--background-modifier-border);
-        border-radius: 10px;
-        overflow: hidden;
-    }
+	:global(.fc .fc-event) {
+		border-radius: 6px;
+		border-color: var(--background-modifier-border);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	}
 
-    .hour-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 1px;
-        background: var(--background-modifier-border);
-        pointer-events: none;
-    }
+	/* ics calendar events */
+	:global(.fc .fc-event.ics-event) {
+		opacity: 0.9;
+		box-shadow: none;
+		padding: 0 !important;
+		overflow: hidden;
+	}
 
-    .now-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: var(--text-accent);
-        display: flex;
-        align-items: center;
-        color: var(--text-accent);
-        font-size: 0.75em;
-        font-weight: 700;
-        pointer-events: none;
-    }
+	:global(.fc .fc-event.ics-event:hover) {
+		opacity: 1;
+	}
 
-    .now-line span {
-        background: var(--background-secondary);
-        padding: 2px 6px;
-        border-radius: 4px;
-        margin-left: 6px;
-    }
+	:global(.ics-event-content) {
+		display: flex;
+		height: 100%;
+		overflow: hidden;
+	}
 
-    .time-block {
-        position: absolute;
-        left: 10px;
-        right: 10px;
-        border-radius: 8px;
-        color: white;
-        padding: 10px;
-        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
-        box-sizing: border-box;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-    }
+	:global(.ics-color-bar) {
+		width: 4px;
+		flex-shrink: 0;
+	}
 
-    .time-block::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-            135deg,
-            rgba(0, 0, 0, 0.1),
-            rgba(255, 255, 255, 0.1)
-        );
-        pointer-events: none;
-    }
+	:global(.ics-event-info) {
+		display: flex;
+		flex-direction: column;
+		padding: 4px 8px;
+		overflow: hidden;
+		min-width: 0;
+	}
 
-    .block-content {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        width: 100%;
-    }
+	/* hide details only when FC marks it as short */
+	:global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
+		display: none;
+	}
 
-    .block-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-weight: 700;
-    }
+	/* timeblock events */
+	:global(.fc .fc-event.timeblock-event) {
+		opacity: 0.85;
+		cursor: grab;
+	}
 
-    .block-icon {
-        font-size: 1.2em;
-    }
+	:global(.fc .fc-event.timeblock-event:hover) {
+		opacity: 1;
+	}
 
-    .block-name {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+	:global(.timeblock-content) {
+		display: flex;
+		flex-direction: column;
+		padding: 4px 8px;
+		height: 100%;
+		overflow: hidden;
+		min-width: 0;
+	}
 
-    .block-times {
-        font-size: 0.9em;
-        opacity: 0.95;
-    }
+	.ics-loading :global(svg) {
+		animation: rotate 1s linear infinite;
+	}
 
-    .block-duration {
-        font-size: 0.85em;
-        opacity: 0.9;
-        font-weight: 600;
-    }
-
-    button {
-        border: 1px solid var(--background-modifier-border);
-        border-radius: 6px;
-        padding: 6px 10px;
-        background: var(--background-secondary);
-        color: var(--text-normal);
-        cursor: pointer;
-        font-weight: 600;
-    }
-
-    button.solid {
-        background: var(--interactive-accent);
-        color: var(--text-on-accent);
-        border-color: var(--interactive-accent);
-    }
-
-    button.ghost {
-        background: transparent;
-    }
-
-    button:hover {
-        filter: brightness(1.05);
-    }
-
-    @media (max-width: 700px) {
-        .schedule-body {
-            flex-direction: column;
-        }
-
-        .time-axis {
-            flex-direction: row;
-            overflow-x: auto;
-            width: 100%;
-        }
-
-        .axis-row {
-            height: auto;
-            padding: 4px;
-        }
-
-        .schedule-canvas {
-            min-height: 900px;
-        }
-
-        .empty-state {
-            left: 12px;
-            right: 12px;
-        }
-    }
-
-    .empty-state {
-        position: absolute;
-        top: 40%;
-        left: 0;
-        right: 0;
-        text-align: center;
-        color: var(--text-muted);
-        font-style: italic;
-        pointer-events: none;
-    }
+	@keyframes rotate {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
 </style>
-
