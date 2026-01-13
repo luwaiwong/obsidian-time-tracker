@@ -4,6 +4,7 @@ import { CreateProjectModal } from "./modals/CreateProjectModal";
 import { CreateCategoryModal } from "./modals/CreateCategoryModal";
 import ProjectSettingsGrid from "./components/ProjectSettingsGrid.svelte";
 import { mount, unmount } from "svelte";
+import { EditCategoryModal } from "./modals/EditCategoryModal";
 
 export class TimeTrackerSettingTab extends PluginSettingTab {
 	plugin: TimeTrackerPlugin;
@@ -319,7 +320,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						.setValue(category.color)
 						.onChange(async (value) => {
 							category.color = value;
-							await this.plugin.saveTimesheet();
+							await this.plugin.categoryHandler.editCategory(category);
 						}),
 				)
 				.addExtraButton((button) =>
@@ -327,15 +328,9 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						.setIcon("pencil")
 						.setTooltip("Rename category")
 						.onClick(async () => {
-							const newName = prompt(
-								"Enter new category name:",
-								category.name,
-							);
-							if (newName && newName.trim()) {
-								category.name = newName.trim();
-								await this.plugin.saveTimesheet();
+							new EditCategoryModal(this.app, this.plugin, category, () => {
 								this.display();
-							}
+							}).open();
 						}),
 				)
 				.addExtraButton((button) =>
