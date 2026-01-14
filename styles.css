@@ -141,3 +141,55 @@ If your plugin does not need CSS, delete this file.
 	margin-bottom: 8px;
 	font-weight: 500;
 }
+
+/* Settings */
+.time-tracker-add-project {
+	margin-top: 16px;
+}
+
+/* Modal styles */
+.modal-header-preview {
+	padding: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	margin-bottom: 16px;
+	margin-top: 8px;
+}
+
+.modal-header-text {
+	font-size: 18px;
+	font-weight: 600;
+	color: white;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header-icon {
+	font-size: 32px;
+	color: white;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.modal-input-container {
+	margin-bottom: 16px;
+}
+
+.modal-input-label {
+	display: block;
+	font-weight: 500;
+	margin-bottom: 4px;
+}
+
+.modal-input-label--color {
+	margin-bottom: 8px;
+}
+
+.modal-input {
+	width: 100%;
+	padding: 8px;
+}
+
+.modal-input--icon {
+	font-size: 16px;
+}

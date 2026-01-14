@@ -9,9 +9,9 @@ const DEV_DIRECTORY = "./";
 const setOutDir = (mode: string) => {
 	switch (mode) {
 		case "development":
-			return `${DEV_DIRECTORY}/.obsidian/plugins/obsidian-time-tracker`;
+			return `${DEV_DIRECTORY}/.obsidian/plugins/time-tracker`;
 		case "production":
-			return "./";
+			return "./build";
 	}
 };
 
@@ -37,7 +37,6 @@ export default defineConfig(({ mode }) => {
 				external: [
 					"obsidian",
 					"electron",
-					"ical.js",
 					"@codemirror/autocomplete",
 					"@codemirror/collab",
 					"@codemirror/commands",

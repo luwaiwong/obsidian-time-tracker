@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import type TimeTrackerPlugin from "../main";
 import { CreateProjectModal } from "./modals/CreateProjectModal";
 import { CreateCategoryModal } from "./modals/CreateCategoryModal";
+import { ConfirmModal } from "./modals/ConfirmModal";
 import ProjectSettingsGrid from "./components/ProjectSettingsGrid.svelte";
 import { mount, unmount } from "svelte";
 import { EditCategoryModal } from "./modals/EditCategoryModal";
@@ -29,8 +30,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			unmount(this.projectGridComponent);
 			this.projectGridComponent = null;
 		}
-
-		containerEl.createEl("h2", { text: "Time Tracker Settings" });
+		new Setting(containerEl).setName('File Locations').setHeading();	
 
 		// file location
 		new Setting(containerEl)
@@ -60,7 +60,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// tracking behavior section
-		containerEl.createEl("h3", { text: "Tracking Behavior" });
+		new Setting(containerEl).setName('Tracking Behavior').setHeading();
 
 		new Setting(containerEl)
 			.setName("Enable retroactive tracking")
@@ -91,7 +91,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// display preferences section
-		containerEl.createEl("h3", { text: "Display Preferences" });
+		new Setting(containerEl).setName('Display Preferences').setHeading();
 
 		// new Setting(containerEl)
 		// 	.setName("Show seconds")
@@ -152,7 +152,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// analytics section
-		containerEl.createEl("h3", { text: "Analytics" });
+		new Setting(containerEl).setName('Analytics').setHeading();
 
 		new Setting(containerEl)
 			.setName("Default time range")
@@ -176,7 +176,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// calendar integration section
-		containerEl.createEl("h3", { text: "Calendar Integration" });
+		new Setting(containerEl).setName('Calendar Integration').setHeading();
 		new Setting(containerEl)
 			.setName("Add new calendar")
 			.setDesc("Add ICS calendar URLs to view them in the schedule view (e.g. https://calendar.google.com/calendar/ical/your@email.com/public/basic.ics)")
@@ -196,7 +196,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		this.renderCalendarList(calendarListContainer);
 
 		// project management section
-		containerEl.createEl("h3", { text: "Project Management" });
+		new Setting(containerEl).setName('Project Management').setHeading();
 
 		// project settings component
 		const projectsGridDiv = containerEl.createDiv(
@@ -214,8 +214,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		});
 
 		// Add new project button
-		const addProjectDiv = containerEl.createDiv();
-		addProjectDiv.style.marginTop = "16px";
+		const addProjectDiv = containerEl.createDiv({ cls: "time-tracker-add-project" });
 		new Setting(addProjectDiv)
 			.setName("Add new project")
 			.addButton((button) =>
@@ -235,7 +234,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// category management section
-		containerEl.createEl("h3", { text: "Category Management" });
+		new Setting(containerEl).setName('Category Management').setHeading();
 
 		const categoriesDiv = containerEl.createDiv("time-tracker-categories");
 		this.displayCategories(categoriesDiv);
@@ -337,15 +336,15 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					button
 						.setIcon("trash")
 						.setTooltip("Delete category")
-						.onClick(async () => {
-							if (
-								confirm(
-									`Delete category "${category.name}"? Projects in this category will be moved to Uncategorized.`,
-								)
-							) {
-								await this.deleteCategory(category.id);
-								this.display();
-							}
+						.onClick(() => {
+							new ConfirmModal(
+								this.app,
+								`Delete category "${category.name}"? Projects in this category will be moved to Uncategorized.`,
+								async () => {
+									await this.deleteCategory(category.id);
+									this.display();
+								},
+							).open();
 						}),
 				);
 		}

@@ -49,76 +49,46 @@ export class CreateProjectModal extends Modal {
 		modalEl.addClass("create-project-modal");
 
 		// Header with color and icon preview
-		this.headerEl = contentEl.createDiv();
-		this.headerEl.style.cssText = `
-			padding: 24px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			border-radius: 8px;
-			margin-bottom: 16px;
-			margin-top: 8px;
-			background-color: ${this.colorInput};
-		`;
+		this.headerEl = contentEl.createDiv({ cls: "modal-header-preview" });
+		this.headerEl.style.backgroundColor = this.colorInput;
 
-		this.headerIconEl = this.headerEl.createEl("span");
-		this.headerIconEl.style.cssText = `
-			font-size: 32px;
-			color: white;
-			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-		`;
+		this.headerIconEl = this.headerEl.createEl("span", { cls: "modal-header-icon" });
 		this.headerIconEl.textContent = this.iconInput;
 
 		// Name input
-		const nameContainer = contentEl.createDiv();
-		nameContainer.style.marginBottom = "16px";
-
-		const nameLabel = nameContainer.createEl("label", { text: "Name" });
-		nameLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 4px;";
+		const nameContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		nameContainer.createEl("label", { text: "Name", cls: "modal-input-label" });
 
 		const nameInputEl = nameContainer.createEl("input", {
 			type: "text",
 			value: this.nameInput,
 			placeholder: "e.g., Study Math",
+			cls: "modal-input",
 		});
-		nameInputEl.style.cssText = "width: 100%; padding: 8px;";
 		nameInputEl.addEventListener("input", (e) => {
 			this.nameInput = (e.target as HTMLInputElement).value;
 		});
 
 		// Icon input
-		const iconContainer = contentEl.createDiv();
-		iconContainer.style.marginBottom = "16px";
-
-		const iconLabel = iconContainer.createEl("label", { text: "Icon/Emoji" });
-		iconLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 4px;";
+		const iconContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		iconContainer.createEl("label", { text: "Icon/Emoji", cls: "modal-input-label" });
 
 		const iconInputEl = iconContainer.createEl("input", {
 			type: "text",
 			value: this.iconInput,
 			placeholder: "Emoji or text (e.g., 📚)",
+			cls: "modal-input modal-input--icon",
 		});
-		iconInputEl.style.cssText =
-			"width: 100%; padding: 8px; font-size: 16px;";
 		iconInputEl.addEventListener("input", (e) => {
 			this.iconInput = (e.target as HTMLInputElement).value;
 			this.updateHeader();
 		});
 
 		// Category dropdown
-		const categoryContainer = contentEl.createDiv();
-		categoryContainer.style.marginBottom = "16px";
+		const categoryContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		categoryContainer.createEl("label", { text: "Category", cls: "modal-input-label" });
 
-		const categoryLabel = categoryContainer.createEl("label", {
-			text: "Category",
-		});
-		categoryLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 4px;";
-
-		const categorySelect = categoryContainer.createEl("select");
-		categorySelect.style.cssText = "width: 100%; padding: 8px;";
+		const categorySelect = categoryContainer.createEl("select", { cls: "modal-input" });
 
 		const uncategorizedOption = categorySelect.createEl("option", {
 			text: "Uncategorized",
@@ -145,12 +115,8 @@ export class CreateProjectModal extends Modal {
 		});
 
 		// Color picker
-		const colorContainer = contentEl.createDiv();
-		colorContainer.style.marginBottom = "16px";
-
-		const colorLabel = colorContainer.createEl("label", { text: "Color" });
-		colorLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 8px;";
+		const colorContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		colorContainer.createEl("label", { text: "Color", cls: "modal-input-label modal-input-label--color" });
 
 		this.colorPickerContainer = colorContainer.createDiv();
 		this.mountColorPicker();

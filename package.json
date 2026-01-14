@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-time-tracker",
+	"name": "time-tracker",
 	"version": "1.0.0",
 	"description": "A fully featured time tracking plugin for Obsidian",
 	"main": "main.ts",

@@ -29,51 +29,29 @@ export class CreateCategoryModal extends Modal {
 		modalEl.addClass("create-category-modal");
 
 		// Header with color preview
-		this.headerEl = contentEl.createDiv();
-		this.headerEl.style.cssText = `
-			padding: 24px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			border-radius: 8px;
-			margin-bottom: 16px;
-			background-color: ${this.colorInput};
-		`;
+		this.headerEl = contentEl.createDiv({ cls: "modal-header-preview" });
+		this.headerEl.style.backgroundColor = this.colorInput;
 
-		const headerText = this.headerEl.createEl("span");
-		headerText.style.cssText = `
-			font-size: 18px;
-			font-weight: 600;
-			color: white;
-			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-		`;
+		const headerText = this.headerEl.createEl("span", { cls: "modal-header-text" });
 		headerText.textContent = "New Category";
 
 		// Name input
-		const nameContainer = contentEl.createDiv();
-		nameContainer.style.marginBottom = "16px";
-
-		const nameLabel = nameContainer.createEl("label", { text: "Name" });
-		nameLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 4px;";
+		const nameContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		nameContainer.createEl("label", { text: "Name", cls: "modal-input-label" });
 
 		const nameInputEl = nameContainer.createEl("input", {
 			type: "text",
 			value: this.nameInput,
 			placeholder: "Category name",
+			cls: "modal-input",
 		});
-		nameInputEl.style.cssText = "width: 100%; padding: 8px;";
 		nameInputEl.addEventListener("input", (e) => {
 			this.nameInput = (e.target as HTMLInputElement).value;
 		});
 
 		// Color picker
-		const colorContainer = contentEl.createDiv();
-		colorContainer.style.marginBottom = "16px";
-
-		const colorLabel = colorContainer.createEl("label", { text: "Color" });
-		colorLabel.style.cssText =
-			"display: block; font-weight: 500; margin-bottom: 8px;";
+		const colorContainer = contentEl.createDiv({ cls: "modal-input-container" });
+		colorContainer.createEl("label", { text: "Color", cls: "modal-input-label modal-input-label--color" });
 
 		this.colorPickerContainer = colorContainer.createDiv();
 		this.mountColorPicker();

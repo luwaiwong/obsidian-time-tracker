@@ -272,7 +272,7 @@ export class CSVHandler {
 		}
 
 		const content = lines.join("\n");
-		await this.vault.modify(file, content);
+		await this.vault.process(file, () => content);
 	}
 
 	async createTimesheet(path: string): Promise<TFile> {

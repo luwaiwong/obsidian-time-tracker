@@ -156,7 +156,7 @@ export class TimeblocksHandler {
 		}
 
 		const content = lines.join("\n");
-		await this.vault.modify(file, content);
+		await this.vault.process(file, () => content);
 	}
 
 	async createTimeblocks(path: string): Promise<TFile> {
