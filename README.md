@@ -8,8 +8,6 @@ Big thanks to the Simple Time Tracker Android App, this plugin was greatly inspi
 ![Svelte](https://img.shields.io/badge/Svelte_5-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 
----
-
 ## Features
 
 ### Time Tracking
