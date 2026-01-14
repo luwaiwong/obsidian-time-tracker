@@ -28,4 +28,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.event.release.tag_name }} \
-            build/main.js build/manifest.json build/styles.css --clobber
+            manifest.json build/main.js build/styles.css --clobber
