@@ -1,12 +1,12 @@
 name: Release Obsidian plugin
 
 on:
-  push:
-    tags:
-      - "*"
+  release:
+    types: [published]
 
 jobs:
   build:
+    if: github.event.release.target_commitish == 'main' 
     runs-on: ubuntu-latest
     permissions:
       contents: write
