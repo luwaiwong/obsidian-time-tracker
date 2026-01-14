@@ -9,9 +9,9 @@ const DEV_DIRECTORY = "./";
 const setOutDir = (mode: string) => {
 	switch (mode) {
 		case "development":
-			return DEV_DIRECTORY;
+			return `${DEV_DIRECTORY}/.obsidian/plugins/obsidian-time-tracker`;
 		case "production":
-			return "build";
+			return "./";
 	}
 };
 
