@@ -5,6 +5,7 @@ import ProjectSelector from "../components/ProjectSelector.svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import Cards from "../components/Cards.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
 
@@ -26,6 +27,7 @@ export class CreateRecordModal extends Modal {
 	private recentRecordsComponent: Record<string, unknown> | null = null;
 	private timeCardsComponent: Record<string, unknown> | null = null;
 	private projectLabelComponent: Record<string, unknown> | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 	private startTimeContainer: HTMLElement | null = null;
 	private endTimeContainer: HTMLElement | null = null;
 	private timeCardsContainer: HTMLElement | null = null;
@@ -148,34 +150,20 @@ export class CreateRecordModal extends Modal {
 
 
 		// action buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.close();
-		});
-
+		const buttonContainer = contentEl.createDiv();
 		const actionText = this.plugin.settings.retroactiveTrackingEnabled
 			? "Record"
 			: "Start";
-		const saveButton = buttonContainer.createEl("button", {
-			text: actionText,
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.save();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: actionText,
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+			},
 		});
 	}
 
@@ -321,6 +309,10 @@ export class CreateRecordModal extends Modal {
 		if (this.timeCardsComponent) {
 			unmount(this.timeCardsComponent);
 			this.timeCardsComponent = null;
+		}
+		if (this.actionButtonsComponent) {
+			unmount(this.actionButtonsComponent);
+			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();
