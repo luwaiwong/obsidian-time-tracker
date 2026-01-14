@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    if: github.event.release.target_commitish == 'main' 
+    if: github.event.release.target_commitish == 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -14,12 +14,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-shred/setup-bun@v2
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      
+
       - name: Build plugin
-        run:
+        run: |
           bun install --frozen-lockfile
           bun run build
 
@@ -27,7 +27,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use upload instead of create
-          # --clobber overwrites files if they somehow already exist
           gh release upload ${{ github.event.release.tag_name }} \
             main.js manifest.json styles.css --clobber
