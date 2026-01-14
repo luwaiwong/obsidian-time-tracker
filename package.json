@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-time-tracker",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "A fully featured time tracking plugin for Obsidian",
 	"main": "main.ts",
 	"scripts": {
 		"dev": "vite build --mode development --watch",
@@ -11,8 +11,10 @@
 		"lint": "biome lint --apply-unsafe ./src"
 	},
 	"keywords": [],
-	"author": "",
-	"license": "MIT",
+	"author": "Lu-Wai Wong",
+	"authorUrl": "https://github.com/luwaiwong",
+	"fundingUrl": "https://ko-fi.com/luwai",
+	"license": "GPL-3.0",
 	"devDependencies": {
 		"@types/node": "^20.19.0",
 		"builtin-modules": "3.3.0",
