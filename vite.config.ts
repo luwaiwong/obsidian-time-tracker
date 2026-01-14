@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
 				external: [
 					"obsidian",
 					"electron",
+					"ical.js",
 					"@codemirror/autocomplete",
 					"@codemirror/collab",
 					"@codemirror/commands",
