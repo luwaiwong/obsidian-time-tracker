@@ -5,6 +5,7 @@ import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import TextArea from "../components/TextArea.svelte";
 import ColorPicker from "../components/ColorPicker.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
 import { getRandomPresetColor } from "../utils/colorUtils";
@@ -27,6 +28,7 @@ export class CreateTimeblockModal extends Modal {
 	private endTimeComponent: Record<string, unknown> | null = null;
 	private colorPickerComponent: Record<string, unknown> | null = null;
 	private colorLabelComponent: Record<string, unknown> | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 
 	constructor(
 		app: App,
@@ -151,24 +153,18 @@ export class CreateTimeblockModal extends Modal {
 		mountSpacer(contentEl, 8);
 
 		// action buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: "Create",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+			},
 		});
-		cancelButton.addEventListener("click", () => this.close());
-
-		const saveButton = buttonContainer.createEl("button", {
-			text: "Create",
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", () => this.save());
 	}
 
 	onClose() {
@@ -180,6 +176,7 @@ export class CreateTimeblockModal extends Modal {
 		if (this.endTimeComponent) unmount(this.endTimeComponent);
 		if (this.colorPickerComponent) unmount(this.colorPickerComponent);
 		if (this.colorLabelComponent) unmount(this.colorLabelComponent);
+		if (this.actionButtonsComponent) unmount(this.actionButtonsComponent);
 		this.contentEl.empty();
 	}
 

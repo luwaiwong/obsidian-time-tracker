@@ -1,7 +1,11 @@
-import { App, Modal, Setting, Notice } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
 import { CSVHandler } from "../handlers/csvHandler";
+import ColorPicker from "../components/ColorPicker.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
+import { mount, unmount } from "svelte";
+import { getRandomPresetColor } from "../utils/colorUtils";
 
 export class CreateProjectModal extends Modal {
 	plugin: TimeTrackerPlugin;
@@ -10,8 +14,14 @@ export class CreateProjectModal extends Modal {
 
 	private nameInput: string = "";
 	private iconInput: string = "🕐";
-	private colorInput: string = "#4ECDC4";
+	private colorInput: string;
 	private categoryId: number = -1;
+
+	private colorPickerComponent: Record<string, unknown> | null = null;
+	private colorPickerContainer: HTMLElement | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
+	private headerEl: HTMLElement | null = null;
+	private headerIconEl: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -29,94 +39,178 @@ export class CreateProjectModal extends Modal {
 			this.iconInput = project.icon;
 			this.colorInput = project.color;
 			this.categoryId = project.categoryId;
+		} else {
+			this.colorInput = getRandomPresetColor();
 		}
 	}
 
 	onOpen() {
-		const { contentEl } = this;
+		const { contentEl, modalEl } = this;
+		modalEl.addClass("create-project-modal");
 
-		contentEl.createEl("h2", {
-			text: this.project ? "Edit Project" : "New Project",
+		// Header with color and icon preview
+		this.headerEl = contentEl.createDiv();
+		this.headerEl.style.cssText = `
+			padding: 24px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 8px;
+			margin-bottom: 16px;
+			margin-top: 8px;
+			background-color: ${this.colorInput};
+		`;
+
+		this.headerIconEl = this.headerEl.createEl("span");
+		this.headerIconEl.style.cssText = `
+			font-size: 32px;
+			color: white;
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+		`;
+		this.headerIconEl.textContent = this.iconInput;
+
+		// Name input
+		const nameContainer = contentEl.createDiv();
+		nameContainer.style.marginBottom = "16px";
+
+		const nameLabel = nameContainer.createEl("label", { text: "Name" });
+		nameLabel.style.cssText =
+			"display: block; font-weight: 500; margin-bottom: 4px;";
+
+		const nameInputEl = nameContainer.createEl("input", {
+			type: "text",
+			value: this.nameInput,
+			placeholder: "e.g., Study Math",
+		});
+		nameInputEl.style.cssText = "width: 100%; padding: 8px;";
+		nameInputEl.addEventListener("input", (e) => {
+			this.nameInput = (e.target as HTMLInputElement).value;
 		});
 
-		new Setting(contentEl)
-			.setName("Project Name")
-			.setDesc("The name of your project")
-			.addText((text) =>
-				text
-					.setPlaceholder("e.g., Study Math")
-					.setValue(this.nameInput)
-					.onChange((value) => {
-						this.nameInput = value;
-					}),
-			);
+		// Icon input
+		const iconContainer = contentEl.createDiv();
+		iconContainer.style.marginBottom = "16px";
 
-		new Setting(contentEl)
-			.setName("Icon")
-			.setDesc("Enter an emoji or text (e.g., 📚, MAT, 301)")
-			.addText((text) =>
-				text
-					.setPlaceholder("📚")
-					.setValue(this.iconInput)
-					.onChange((value) => {
-						this.iconInput = value;
-					}),
-			);
+		const iconLabel = iconContainer.createEl("label", { text: "Icon/Emoji" });
+		iconLabel.style.cssText =
+			"display: block; font-weight: 500; margin-bottom: 4px;";
 
-		new Setting(contentEl)
-			.setName("Color")
-			.setDesc("Pick a color for this project")
-			.addColorPicker((color) =>
-				color.setValue(this.colorInput).onChange((value) => {
-					this.colorInput = value;
-				}),
-			);
+		const iconInputEl = iconContainer.createEl("input", {
+			type: "text",
+			value: this.iconInput,
+			placeholder: "Emoji or text (e.g., 📚)",
+		});
+		iconInputEl.style.cssText =
+			"width: 100%; padding: 8px; font-size: 16px;";
+		iconInputEl.addEventListener("input", (e) => {
+			this.iconInput = (e.target as HTMLInputElement).value;
+			this.updateHeader();
+		});
 
-		new Setting(contentEl)
-			.setName("Category")
-			.setDesc("Assign to a category (optional)")
-			.addDropdown((dropdown) => {
-				dropdown.addOption("-1", "Uncategorized");
-				for (const category of this.plugin.timesheetData.categories) {
-					if (category.id !== 1) {
-						dropdown.addOption(String(category.id), category.name);
-					}
-				}
-				dropdown.setValue(String(this.categoryId));
-				dropdown.onChange((value) => {
-					this.categoryId = parseInt(value);
+		// Category dropdown
+		const categoryContainer = contentEl.createDiv();
+		categoryContainer.style.marginBottom = "16px";
+
+		const categoryLabel = categoryContainer.createEl("label", {
+			text: "Category",
+		});
+		categoryLabel.style.cssText =
+			"display: block; font-weight: 500; margin-bottom: 4px;";
+
+		const categorySelect = categoryContainer.createEl("select");
+		categorySelect.style.cssText = "width: 100%; padding: 8px;";
+
+		const uncategorizedOption = categorySelect.createEl("option", {
+			text: "Uncategorized",
+			value: "-1",
+		});
+		if (this.categoryId === -1) {
+			uncategorizedOption.selected = true;
+		}
+
+		for (const category of this.plugin.timesheetData.categories) {
+			if (category.id !== 1) {
+				const option = categorySelect.createEl("option", {
+					text: category.name,
+					value: String(category.id),
 				});
-			});
+				if (category.id === this.categoryId) {
+					option.selected = true;
+				}
+			}
+		}
 
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.close();
+		categorySelect.addEventListener("change", (e) => {
+			this.categoryId = parseInt((e.target as HTMLSelectElement).value);
 		});
 
-		const saveButton = buttonContainer.createEl("button", {
-			text: "Save",
-			cls: "mod-cta",
-			attr: { type: "button" },
+		// Color picker
+		const colorContainer = contentEl.createDiv();
+		colorContainer.style.marginBottom = "16px";
+
+		const colorLabel = colorContainer.createEl("label", { text: "Color" });
+		colorLabel.style.cssText =
+			"display: block; font-weight: 500; margin-bottom: 8px;";
+
+		this.colorPickerContainer = colorContainer.createDiv();
+		this.mountColorPicker();
+
+		// action buttons
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: this.project ? "Save" : "Create",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+			},
 		});
-		saveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.save();
+	}
+
+	private updateHeader() {
+		if (this.headerEl) {
+			this.headerEl.style.backgroundColor = this.colorInput;
+		}
+		if (this.headerIconEl) {
+			this.headerIconEl.textContent = this.iconInput;
+		}
+	}
+
+	private mountColorPicker() {
+		if (!this.colorPickerContainer) return;
+
+		if (this.colorPickerComponent) {
+			unmount(this.colorPickerComponent);
+		}
+
+		this.colorPickerContainer.empty();
+
+		this.colorPickerComponent = mount(ColorPicker, {
+			target: this.colorPickerContainer,
+			props: {
+				value: this.colorInput,
+				onChange: (color: string) => {
+					this.colorInput = color;
+					this.updateHeader();
+					// Remount to update selected state
+					this.mountColorPicker();
+				},
+			},
 		});
 	}
 
 	onClose() {
+		if (this.colorPickerComponent) {
+			unmount(this.colorPickerComponent);
+			this.colorPickerComponent = null;
+		}
+		if (this.actionButtonsComponent) {
+			unmount(this.actionButtonsComponent);
+			this.actionButtonsComponent = null;
+		}
 		const { contentEl } = this;
 		contentEl.empty();
 	}

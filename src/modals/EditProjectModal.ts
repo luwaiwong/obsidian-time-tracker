@@ -2,6 +2,7 @@ import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project } from "../types";
 import ColorPicker from "../components/ColorPicker.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 
 export class EditProjectModal extends Modal {
@@ -16,6 +17,7 @@ export class EditProjectModal extends Modal {
 
 	private colorPickerComponent: Record<string, unknown> | null = null;
 	private colorPickerContainer: HTMLElement | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 	private headerEl: HTMLElement | null = null;
 	private headerIconEl: HTMLElement | null = null;
 
@@ -147,61 +149,22 @@ export class EditProjectModal extends Modal {
 		this.colorPickerContainer = colorContainer.createDiv();
 		this.mountColorPicker();
 
-		// bottom buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "space-between";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const leftButtons = buttonContainer.createDiv();
-		leftButtons.style.display = "flex";
-		leftButtons.style.gap = "8px";
-
-		const deleteButton = leftButtons.createEl("button", {
-			text: "Delete",
-			cls: "mod-warning",
-			attr: { type: "button" },
-		});
-		deleteButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.delete();
-		});
-
-		const archiveButton = leftButtons.createEl("button", {
-			text: this.project.archived ? "Unarchive" : "Archive",
-			attr: { type: "button" },
-		});
-		archiveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.toggleArchive();
-		});
-
-		const rightButtons = buttonContainer.createDiv();
-		rightButtons.style.display = "flex";
-		rightButtons.style.gap = "8px";
-
-		const cancelButton = rightButtons.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.close();
-		});
-
-		const saveButton = rightButtons.createEl("button", {
-			text: "Save",
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.save();
+		// action buttons
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: "Save",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+				leftButtons: [
+					{ text: "Delete", onClick: () => this.delete(), variant: "warning" },
+					{ text: this.project.archived ? "Unarchive" : "Archive", onClick: () => this.toggleArchive() },
+				],
+			},
 		});
 	}
 
@@ -241,6 +204,10 @@ export class EditProjectModal extends Modal {
 		if (this.colorPickerComponent) {
 			unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
+		}
+		if (this.actionButtonsComponent) {
+			unmount(this.actionButtonsComponent);
+			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();

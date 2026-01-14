@@ -71,16 +71,32 @@ export class ImportModal extends Modal {
 			this.fileContent = textArea.value;
 		});
 
-		new Setting(contentEl)
-			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => this.close()),
-			)
-			.addButton((button) =>
-				button
-					.setButtonText("Import")
-					.setCta()
-					.onClick(() => this.doImport()),
-			);
+		const buttonContainer = contentEl.createDiv("modal-button-container");
+		buttonContainer.style.display = "flex";
+		buttonContainer.style.justifyContent = "flex-end";
+		buttonContainer.style.gap = "8px";
+		buttonContainer.style.marginTop = "20px";
+
+		const cancelButton = buttonContainer.createEl("button", {
+			text: "Cancel",
+			attr: { type: "button" },
+		});
+		cancelButton.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.close();
+		});
+
+		const importButton = buttonContainer.createEl("button", {
+			text: "Import",
+			cls: "mod-cta",
+			attr: { type: "button" },
+		});
+		importButton.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.doImport();
+		});
 	}
 
 	onClose() {

@@ -2,6 +2,7 @@ import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Project, TimeRecord } from "../types";
 import ProjectSelector from "../components/ProjectSelector.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
@@ -29,6 +30,7 @@ export class EditRecordModal extends Modal {
 	private titleComponent: Record<string, unknown> | null = null;
 	private titleLabelComponent: Record<string, unknown> | null = null;
 	private timeCardsComponent: Record<string, unknown> | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 
 	private timeCardsContainer: HTMLElement;
 	private gridContainer: HTMLElement;
@@ -112,47 +114,21 @@ export class EditRecordModal extends Modal {
 		this.gridContainer = contentEl.createDiv("project-grid-container");
 		this.gridComponent = this.mountGridComponent(this.gridContainer);
 
-		// bottom buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "space-between";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const deleteButton = buttonContainer.createEl("button", {
-			text: "Delete",
-			cls: "mod-warning",
-			attr: { type: "button" },
-		});
-		deleteButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.delete();
-		});
-
-		const rightButtons = buttonContainer.createDiv();
-		rightButtons.style.display = "flex";
-		rightButtons.style.gap = "8px";
-
-		const cancelButton = rightButtons.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.close();
-		});
-
-		const saveButton = rightButtons.createEl("button", {
-			text: "Save",
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.save();
+		// action buttons
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: "Save",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+				leftButtons: [
+					{ text: "Delete", onClick: () => this.delete(), variant: "warning" },
+				],
+			},
 		});
 	}
 
@@ -192,6 +168,10 @@ export class EditRecordModal extends Modal {
 		if (this.projectLabelComponent) {
 			unmount(this.projectLabelComponent);
 			this.projectLabelComponent = null;
+		}
+		if (this.actionButtonsComponent) {
+			unmount(this.actionButtonsComponent);
+			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();

@@ -1,6 +1,7 @@
 import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import ColorPicker from "../components/ColorPicker.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 import { getRandomPresetColor } from "../utils/colorUtils";
 
@@ -13,6 +14,7 @@ export class CreateCategoryModal extends Modal {
 
 	private colorPickerComponent: Record<string, unknown> | null = null;
 	private colorPickerContainer: HTMLElement | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 	private headerEl: HTMLElement | null = null;
 
 	constructor(app: App, plugin: TimeTrackerPlugin, onSave: () => void) {
@@ -76,32 +78,18 @@ export class CreateCategoryModal extends Modal {
 		this.colorPickerContainer = colorContainer.createDiv();
 		this.mountColorPicker();
 
-		// Bottom buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.close();
-		});
-
-		const saveButton = buttonContainer.createEl("button", {
-			text: "Create",
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			await this.save();
+		// action buttons
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: "Create",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+			},
 		});
 	}
 
@@ -137,6 +125,10 @@ export class CreateCategoryModal extends Modal {
 		if (this.colorPickerComponent) {
 			unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
+		}
+		if (this.actionButtonsComponent) {
+			unmount(this.actionButtonsComponent);
+			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
 		contentEl.empty();

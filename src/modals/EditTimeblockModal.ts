@@ -5,6 +5,7 @@ import TimeSelector from "../components/TimeSelector.svelte";
 import TextInput from "../components/TextInput.svelte";
 import TextArea from "../components/TextArea.svelte";
 import ColorPicker from "../components/ColorPicker.svelte";
+import ModalActionButtons from "../components/ModalActionButtons.svelte";
 import { mount, unmount } from "svelte";
 import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
 
@@ -28,6 +29,7 @@ export class EditTimeblockModal extends Modal {
 	private endTimeComponent: Record<string, unknown> | null = null;
 	private colorPickerComponent: Record<string, unknown> | null = null;
 	private colorLabelComponent: Record<string, unknown> | null = null;
+	private actionButtonsComponent: Record<string, unknown> | null = null;
 
 	constructor(
 		app: App,
@@ -157,35 +159,21 @@ export class EditTimeblockModal extends Modal {
 		mountSpacer(contentEl, 8);
 
 		// action buttons
-		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "space-between";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
-
-		const deleteButton = buttonContainer.createEl("button", {
-			text: "Delete",
-			cls: "mod-warning",
-			attr: { type: "button" },
+		const buttonContainer = contentEl.createDiv();
+		this.actionButtonsComponent = mount(ModalActionButtons, {
+			target: buttonContainer,
+			props: {
+				primaryButton: {
+					text: "Save",
+					onClick: () => this.save(),
+					variant: "cta",
+				},
+				cancelButton: { onClick: () => this.close() },
+				leftButtons: [
+					{ text: "Delete", onClick: () => this.delete(), variant: "warning" },
+				],
+			},
 		});
-		deleteButton.addEventListener("click", () => this.delete());
-
-		const rightButtons = buttonContainer.createDiv();
-		rightButtons.style.display = "flex";
-		rightButtons.style.gap = "8px";
-
-		const cancelButton = rightButtons.createEl("button", {
-			text: "Cancel",
-			attr: { type: "button" },
-		});
-		cancelButton.addEventListener("click", () => this.close());
-
-		const saveButton = rightButtons.createEl("button", {
-			text: "Save",
-			cls: "mod-cta",
-			attr: { type: "button" },
-		});
-		saveButton.addEventListener("click", () => this.save());
 	}
 
 	onClose() {
@@ -197,6 +185,7 @@ export class EditTimeblockModal extends Modal {
 		if (this.endTimeComponent) unmount(this.endTimeComponent);
 		if (this.colorPickerComponent) unmount(this.colorPickerComponent);
 		if (this.colorLabelComponent) unmount(this.colorLabelComponent);
+		if (this.actionButtonsComponent) unmount(this.actionButtonsComponent);
 		this.contentEl.empty();
 	}
 
