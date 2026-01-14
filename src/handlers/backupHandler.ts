@@ -26,7 +26,6 @@ export class BackupHandler {
 			}
 			return true;
 		} catch (err) {
-			console.error("Error ensuring backup folder exists:", err);
 			return false;
 		}
 	}
@@ -35,13 +34,11 @@ export class BackupHandler {
 		try {
 			const folderReady = await this.checkBackupFolder();
 			if (!folderReady) {
-				console.error("Backup folder not available, skipping backup");
 				return;
 			}
 
 			const timesheetFile = this.vault.getAbstractFileByPath(timesheetPath);
 			if (!(timesheetFile instanceof TFile)) {
-				console.error("Timesheet file not found, skipping backup");
 				return;
 			}
 
@@ -55,13 +52,9 @@ export class BackupHandler {
 						lastBackup.path,
 					);
 					if (content === lastBackupContent) {
-						console.log(
-							"Backup skipped: content is identical to last backup",
-						);
 						return;
 					}
 				} catch (err) {
-					console.error("Error reading last backup for comparison:", err);
 				}
 			}
 
@@ -70,11 +63,9 @@ export class BackupHandler {
 			const backupPath = `${BACKUP_FOLDER}/${backupFilename}`;
 
 			await this.vault.create(backupPath, content);
-			console.log(`Backup created: ${backupPath}`);
 
 			await this.cleanupBackups();
 		} catch (err) {
-			console.error("Error creating backup:", err);
 		}
 	}
 
@@ -116,14 +107,12 @@ export class BackupHandler {
 						mtime: stat.mtime || 0,
 					});
 				} catch (err) {
-					console.error(`Error processing backup file ${fullPath}:`, err);
 				}
 			}
 
 			backupFiles.sort((a, b) => b.mtime - a.mtime);
 			return backupFiles;
 		} catch (err) {
-			console.error("Error listing backups:", err);
 			return [];
 		}
 	}
@@ -152,15 +141,12 @@ export class BackupHandler {
 						const stat = await this.vault.adapter.stat(fullPath);
 						if (stat && stat.mtime && stat.mtime < cutoffTime) {
 							await this.vault.delete(file);
-							console.log(`Deleted old backup: ${fullPath}`);
 						}
 					}
 				} catch (err) {
-					console.error(`Error deleting backup ${filePath}:`, err);
 				}
 			}
 		} catch (err) {
-			console.error("Error cleaning up old backups:", err);
 		}
 	}
 }

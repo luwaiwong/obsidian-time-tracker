@@ -376,7 +376,6 @@ export class ImportModal extends Modal {
 
 			this.close();
 		} catch (err) {
-			console.error("Import error:", err);
 			new Notice("Error importing data: " + (err as Error).message);
 		}
 	}

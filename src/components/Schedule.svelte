@@ -223,7 +223,6 @@
 
 
 	async function fetchIcsEvents(force = false) {
-		console.log("fetching ICS events", force);
 		if (force) {
 			// reset stuck loading state and allow re-fetch
 			plugin.icsCache.fetched = false;
@@ -239,7 +238,6 @@
 
 		icsLoading = true;
 		await fetchIcsCalendars(plugin);
-		console.log("finshed fetching ICS events", plugin.icsCache.events.length);
 		icsEvents = plugin.icsCache.events;
 		icsLoading = false;
 		await updateCalendarEvents();
@@ -250,7 +248,6 @@
 	}
 
 	async function updateCalendarEvents() {
-		console.log("updating calendar events");
 		if (!calendar) return;
 		if (isUpdatingCalendar) {
 			pendingCalendarUpdate = true;

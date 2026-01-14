@@ -67,7 +67,7 @@
 			return projectName;
 		}
 		if (plugin.settings.retroactiveTrackingEnabled) {
-			return "Track Retroactively";
+			return "Track retroactively";
 		}
 		return "Start tracking...";
 	}

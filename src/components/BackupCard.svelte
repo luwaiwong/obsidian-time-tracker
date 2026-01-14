@@ -65,7 +65,6 @@
 		try {
 			backupData = await onExpand(backupPath);
 		} catch (err) {
-			console.error("Error loading backup data:", err);
 			error = "Error loading backup data";
 		} finally {
 			isLoading = false;

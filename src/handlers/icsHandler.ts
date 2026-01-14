@@ -81,7 +81,6 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 					}
 				}
 			} catch (err) {
-				console.error("Failed to fetch ICS:", url, err);
 			}
 		}
 

@@ -155,7 +155,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			await this.loadTimesheet();
 			await this.loadTimeblocks();
 		} catch (err) {
-			console.error("Error loading plugin data:", err);
 		}
 	}
 
@@ -191,12 +190,10 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.isLoading = true;
 		}
 
-		console.log("Loading timesheet...");
 		try {
 			const file = this.app.vault.getAbstractFileByPath(
 				this.settings.timesheetPath,
 			);
-			console.log("File found:", file);
 
 			let newData: TimesheetData;
 			if (file instanceof TFile) {
@@ -213,7 +210,6 @@ export default class TimeTrackerPlugin extends Plugin {
 
 			// compare new data with current data, skip refresh if unchanged
 			if (this.isTimesheetDataEqual(this.timesheetData, newData)) {
-				console.log("Timesheet data unchanged, skipping refresh");
 				this.isLoading = false;
 				return;
 			}
@@ -222,7 +218,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.isLoading = false;
 			this.refreshViews();
 		} catch (err) {
-			console.error("Error loading timesheet:", err);
 			this.error = "Error loading Timesheet: " + err;
 			this.isLoading = false;
 			this.refreshViews();
@@ -263,7 +258,6 @@ export default class TimeTrackerPlugin extends Plugin {
 				this.timesheetData,
 			);
 		} catch (err) {
-			console.error("Error saving timesheet:", err);
 			this.error = "Error saving Timesheet: " + err;
 		}
 	}
@@ -294,7 +288,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.timeblocksData = newData;
 			this.refreshViews();
 		} catch (err) {
-			console.error("Error loading timeblocks:", err);
 		}
 	}
 
@@ -307,7 +300,6 @@ export default class TimeTrackerPlugin extends Plugin {
 				this.timeblocksData,
 			);
 		} catch (err) {
-			console.error("Error saving timeblocks:", err);
 		}
 	}
 
@@ -401,7 +393,6 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		// for retroactive
 		if (this.settings.retroactiveTrackingEnabled) {
-			console.log("Retroactive tracking enabled");
 			const lastRecord = this.getLastStoppedRecord();
 			if (lastRecord && lastRecord.endTime) {
 				const gap = now.getTime() - lastRecord.endTime.getTime();

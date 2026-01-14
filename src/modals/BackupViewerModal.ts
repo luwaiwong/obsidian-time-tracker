@@ -92,7 +92,6 @@ export class BackupViewerModal extends Modal {
 			new Notice("Backup restored successfully");
 			this.close();
 		} catch (err) {
-			console.error("Error restoring backup:", err);
 			new Notice("Error restoring backup: " + err);
 		}
 	}
@@ -105,7 +104,6 @@ export class BackupViewerModal extends Modal {
 			const backups = await this.backupHandler.listBackups();
 			await this.renderBackups(backups);
 		} catch (err) {
-			console.error("Error deleting backup:", err);
 			new Notice("Error deleting backup: " + err);
 		}
 	}

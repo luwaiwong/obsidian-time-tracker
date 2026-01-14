@@ -201,7 +201,6 @@ export class EditTimeblockModal extends Modal {
 		}
 
 		const notesValue = (this.notesInput ?? "").trim();
-		console.log("notesInput", notesValue);
 		const updated: Partial<Timeblock> = {
 			title: this.titleInput.trim(),
 			startTime: new Date(this.startTime),
