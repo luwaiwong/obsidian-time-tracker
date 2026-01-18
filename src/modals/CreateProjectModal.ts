@@ -71,7 +71,7 @@ export class CreateProjectModal extends Modal {
 
 		// Icon input
 		const iconContainer = contentEl.createDiv({ cls: "modal-input-container" });
-		iconContainer.createEl("label", { text: "Icon/Emoji", cls: "modal-input-label" });
+		iconContainer.createEl("label", { text: "Icon/emoji", cls: "modal-input-label" });
 
 		const iconInputEl = iconContainer.createEl("input", {
 			type: "text",
@@ -149,7 +149,7 @@ export class CreateProjectModal extends Modal {
 		if (!this.colorPickerContainer) return;
 
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 		}
 
 		this.colorPickerContainer.empty();
@@ -170,11 +170,11 @@ export class CreateProjectModal extends Modal {
 
 	onClose() {
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
 		}
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
@@ -188,7 +188,6 @@ export class CreateProjectModal extends Modal {
 		}
 
 		if (this.project) {
-			const oldName = this.project.name;
 			const newName = this.nameInput.trim();
 
 			this.project.name = newName;

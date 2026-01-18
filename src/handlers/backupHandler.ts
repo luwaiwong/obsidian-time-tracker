@@ -1,4 +1,4 @@
-import { TFile, Vault } from "obsidian";
+import { Notice, TFile, Vault } from "obsidian";
 
 const BACKUP_FOLDER = ".timebackups";
 const BACKUP_RETENTION_DAYS = 5;
@@ -26,6 +26,7 @@ export class BackupHandler {
 			}
 			return true;
 		} catch (err) {
+			new Notice("Error checking backup folder: " + err);
 			return false;
 		}
 	}
@@ -55,6 +56,7 @@ export class BackupHandler {
 						return;
 					}
 				} catch (err) {
+					new Notice("Error checking backups: " + err);
 				}
 			}
 
@@ -66,6 +68,7 @@ export class BackupHandler {
 
 			await this.cleanupBackups();
 		} catch (err) {
+			new Notice("Error creating backup: " + err);
 		}
 	}
 
@@ -107,12 +110,14 @@ export class BackupHandler {
 						mtime: stat.mtime || 0,
 					});
 				} catch (err) {
+					new Notice("Error listing backups: " + err);
 				}
 			}
 
 			backupFiles.sort((a, b) => b.mtime - a.mtime);
 			return backupFiles;
 		} catch (err) {
+			new Notice("Error listing backups: " + err);
 			return [];
 		}
 	}
@@ -144,9 +149,11 @@ export class BackupHandler {
 						}
 					}
 				} catch (err) {
+					new Notice("Error cleaning up backups: " + err);
 				}
 			}
 		} catch (err) {
+			new Notice("Error cleaning up backups: " + err);
 		}
 	}
 }

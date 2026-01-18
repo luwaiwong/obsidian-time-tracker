@@ -2,6 +2,7 @@
 import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
+import globals from "globals";
 
 export default defineConfig([
   {
@@ -14,6 +15,9 @@ export default defineConfig([
     languageOptions: {
       parser: tsparser,
       parserOptions: { project: "./tsconfig.json" },
+      globals: {
+        ...globals.browser, // standard browser globals (window, document, setTimeout, etc.)
+      },
     },
 
     // Optional project overrides
@@ -21,10 +25,11 @@ export default defineConfig([
       "obsidianmd/ui/sentence-case": [
         "warn",
         {
-          brands: ["Time Tracker"],
+          brands: ["Time Tracker, Simple Time Tracker"],
           acronyms: ["OK"],
           enforceCamelCaseLower: true,
         },
+
       ],
     },
   },

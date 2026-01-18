@@ -1,4 +1,4 @@
-import { App, Modal, Setting, Notice } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import type { Category, Project, TimeRecord } from "../types";
 import { CSVHandler } from "../handlers/csvHandler";
@@ -51,20 +51,17 @@ export class ImportModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("time-tracker-import-modal");
 
-		contentEl.createEl("h2", { text: "Import from Simple Time Tracker" });
+		contentEl.createEl("h2", { text: "Import from simple time tracker" });
 
 		contentEl.createEl("p", {
-			text: "Paste the contents of your Simple Time Tracker backup file (.backup) below.",
+			text: "Paste the contents of an stt backup file (.backup) below.",
 			cls: "setting-item-description",
 		});
 
 		const textArea = contentEl.createEl("textarea", {
 			cls: "time-tracker-import-textarea",
 		});
-		textArea.style.width = "100%";
-		textArea.style.height = "200px";
-		textArea.style.fontFamily = "monospace";
-		textArea.style.fontSize = "12px";
+		textArea.setCssProps({ width: "100%", height: "200px", fontFamily: "monospace", fontSize: "12px" });
 		textArea.placeholder = "Paste backup file contents here...";
 
 		textArea.addEventListener("input", () => {
@@ -72,10 +69,7 @@ export class ImportModal extends Modal {
 		});
 
 		const buttonContainer = contentEl.createDiv("modal-button-container");
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "8px";
-		buttonContainer.style.marginTop = "20px";
+		buttonContainer.setCssProps({ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "20px" });
 
 		const cancelButton = buttonContainer.createEl("button", {
 			text: "Cancel",
@@ -95,7 +89,7 @@ export class ImportModal extends Modal {
 		importButton.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this.doImport();
+			void this.doImport();
 		});
 	}
 

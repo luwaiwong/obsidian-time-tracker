@@ -27,10 +27,10 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 
 		// Clean up previous Svelte component
 		if (this.projectGridComponent) {
-			unmount(this.projectGridComponent);
+			void unmount(this.projectGridComponent);
 			this.projectGridComponent = null;
 		}
-		new Setting(containerEl).setName('File Locations').setHeading();	
+		new Setting(containerEl).setName('File locations').setHeading();	
 
 		// file location
 		new Setting(containerEl)
@@ -38,7 +38,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setDesc("Path to the timesheet.csv file (relative to vault root)")
 			.addText((text) =>
 				text
-					.setPlaceholder("timesheet.csv")
+					.setPlaceholder("Timesheet.csv".toLowerCase())
 					.setValue(this.plugin.settings.timesheetPath)
 					.onChange(async (value) => {
 						this.plugin.settings.timesheetPath = value;
@@ -51,7 +51,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setDesc("Path to the timeblocks.csv file for planned time blocks (relative to vault root)")
 			.addText((text) =>
 				text
-					.setPlaceholder("timeblocks.csv")
+					.setPlaceholder("Timeblocks.csv".toLowerCase())
 					.setValue(this.plugin.settings.timeblocksPath)
 					.onChange(async (value) => {
 						this.plugin.settings.timeblocksPath = value;
@@ -60,7 +60,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// tracking behavior section
-		new Setting(containerEl).setName('Tracking Behavior').setHeading();
+		new Setting(containerEl).setName('Tracking behavior').setHeading();
 
 		new Setting(containerEl)
 			.setName("Enable retroactive tracking")
@@ -91,7 +91,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// display preferences section
-		new Setting(containerEl).setName('Display Preferences').setHeading();
+		new Setting(containerEl).setName('Display preferences').setHeading();
 
 		// new Setting(containerEl)
 		// 	.setName("Show seconds")
@@ -136,10 +136,10 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setDesc("How to sort projects in the grid")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("category", "By Category")
-					.addOption("color", "By Color")
-					.addOption("name", "By Name")
-					.addOption("recent", "Recently Used")
+					.addOption("category", "By category")
+					.addOption("color", "By color")
+					.addOption("name", "By name")
+					.addOption("recent", "Recently used")
 					.setValue(this.plugin.settings.sortMode)
 					.onChange(
 						async (
@@ -176,13 +176,13 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// calendar integration section
-		new Setting(containerEl).setName('Calendar Integration').setHeading();
+		new Setting(containerEl).setName('Calendar integration').setHeading();
 		new Setting(containerEl)
 			.setName("Add new calendar")
 			.setDesc("Add ICS calendar URLs to view them in the schedule view (e.g. https://calendar.google.com/calendar/ical/your@email.com/public/basic.ics)")
 			.addButton((button) =>
 				button
-					.setButtonText("Add Calendar")
+					.setButtonText("Add calendar")
 					.setCta()
 					.onClick(() => {
 						this.plugin.settings.icsCalendars.push("");
@@ -196,7 +196,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		this.renderCalendarList(calendarListContainer);
 
 		// project management section
-		new Setting(containerEl).setName('Project Management').setHeading();
+		new Setting(containerEl).setName('Project management').setHeading();
 
 		// project settings component
 		const projectsGridDiv = containerEl.createDiv(
@@ -219,7 +219,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setName("Add new project")
 			.addButton((button) =>
 				button
-					.setButtonText("Add Project")
+					.setButtonText("Add project")
 					.setCta()
 					.onClick(() => {
 						new CreateProjectModal(
@@ -234,7 +234,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			);
 
 		// category management section
-		new Setting(containerEl).setName('Category Management').setHeading();
+		new Setting(containerEl).setName('Category management').setHeading();
 
 		const categoriesDiv = containerEl.createDiv("time-tracker-categories");
 		this.displayCategories(categoriesDiv);
@@ -243,7 +243,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 			.setName("Add new category")
 			.addButton((button) =>
 				button
-					.setButtonText("Add Category")
+					.setButtonText("Add category")
 					.setCta()
 					.onClick(() => {
 						new CreateCategoryModal(this.app, this.plugin, () => {
@@ -256,7 +256,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 	hide(): void {
 		// Clean up Svelte component when settings tab is hidden
 		if (this.projectGridComponent) {
-			unmount(this.projectGridComponent);
+			void unmount(this.projectGridComponent);
 			this.projectGridComponent = null;
 		}
 	}
@@ -340,9 +340,11 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 							new ConfirmModal(
 								this.app,
 								`Delete category "${category.name}"? Projects in this category will be moved to Uncategorized.`,
-								async () => {
-									await this.deleteCategory(category.id);
-									this.display();
+								() => {
+									void (async () => {
+										await this.deleteCategory(category.id);
+										this.display();
+									})();
 								},
 							).open();
 						}),

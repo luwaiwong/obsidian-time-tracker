@@ -1,8 +1,5 @@
 import { TFile, Vault } from "obsidian";
 import type {
-	Project,
-	TimeRecord,
-	Category,
 	TimesheetData,
 	CSVLineType,
 } from "../types";

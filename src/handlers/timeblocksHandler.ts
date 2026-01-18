@@ -1,5 +1,5 @@
 import { TFile, Vault } from "obsidian";
-import type { Timeblock, TimeblocksData } from "../types";
+import type { TimeblocksData } from "../types";
 
 /**
  * Handles reading and writing the timeblocks.csv file.

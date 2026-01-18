@@ -55,13 +55,13 @@ export class AnalyticsView extends ItemView {
 
 	async onClose() {
 		if (this.component) {
-			unmount(this.component);
+			void unmount(this.component);
 			this.component = null;
 		}
 	}
 
 	refresh() {
-		this.onClose();
-		this.onOpen();
+		void this.onClose();
+		void this.onOpen();
 	}
 }

@@ -22,36 +22,38 @@ export class IcsEventModal extends Modal {
 	onOpen() {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("ics-event-modal");
-		modalEl.style.maxWidth = "400px";
+		modalEl.setCssProps({ maxWidth: "400px" });
 
 		// color bar at top
 		const colorBar = contentEl.createDiv();
-		colorBar.style.height = "6px";
-		colorBar.style.backgroundColor = this.data.color || "#6b7280";
-		colorBar.style.marginBottom = "16px";
-		colorBar.style.borderRadius = "3px";
+		colorBar.setCssProps({
+			height: "6px",
+			backgroundColor: this.data.color || "#6b7280",
+			marginBottom: "16px",
+			borderRadius: "3px",
+		});
 
 		// source name
 		if (this.data.sourceName) {
 			const sourceEl = contentEl.createDiv();
-			sourceEl.style.fontSize = "0.75em";
-			sourceEl.style.color = "var(--text-muted)";
-			sourceEl.style.marginBottom = "4px";
-			sourceEl.style.textTransform = "uppercase";
-			sourceEl.style.letterSpacing = "0.05em";
+			sourceEl.setCssProps({
+				fontSize: "0.75em",
+				color: "var(--text-muted)",
+				marginBottom: "4px",
+				textTransform: "uppercase",
+				letterSpacing: "0.05em",
+			});
 			sourceEl.setText(this.data.sourceName);
 		}
 
 		// title
 		const titleEl = contentEl.createEl("h2", { text: this.data.title });
-		titleEl.style.marginTop = "0";
-		titleEl.style.marginBottom = "12px";
+		titleEl.setCssProps({ marginTop: "0", marginBottom: "12px" });
 
 		// time
 		if (this.data.start) {
 			const timeEl = contentEl.createDiv();
-			timeEl.style.marginBottom = "8px";
-			timeEl.style.color = "var(--text-muted)";
+			timeEl.setCssProps({ marginBottom: "8px", color: "var(--text-muted)" });
 			const startStr = this.data.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 			const endStr = this.data.end?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 			const dateStr = this.data.start.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
@@ -61,31 +63,32 @@ export class IcsEventModal extends Modal {
 		// location
 		if (this.data.location) {
 			const locEl = contentEl.createDiv();
-			locEl.style.marginBottom = "8px";
-			locEl.style.color = "var(--text-muted)";
+			locEl.setCssProps({ marginBottom: "8px", color: "var(--text-muted)" });
 			locEl.setText(`📍 ${this.data.location}`);
 		}
 
 		// description
 		if (this.data.description) {
 			const descEl = contentEl.createDiv();
-			descEl.style.marginTop = "12px";
-			descEl.style.padding = "12px";
-			descEl.style.backgroundColor = "var(--background-secondary)";
-			descEl.style.borderRadius = "6px";
-			descEl.style.whiteSpace = "pre-wrap";
+			descEl.setCssProps({
+				marginTop: "12px",
+				padding: "12px",
+				backgroundColor: "var(--background-secondary)",
+				borderRadius: "6px",
+				whiteSpace: "pre-wrap",
+			});
 			descEl.setText(this.data.description);
 		}
 
 		// link
 		if (this.data.url) {
 			const linkContainer = contentEl.createDiv();
-			linkContainer.style.marginTop = "16px";
+			linkContainer.setCssProps({ marginTop: "16px" });
 			const linkEl = linkContainer.createEl("a", {
 				text: "🔗 Open link",
 				href: this.data.url,
 			});
-			linkEl.style.color = "var(--interactive-accent)";
+			linkEl.setCssProps({ color: "var(--interactive-accent)" });
 			linkEl.setAttr("target", "_blank");
 		}
 	}

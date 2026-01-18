@@ -18,10 +18,10 @@ export class ConflictResolverModal extends Modal {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("create-record-modal");
 
-		contentEl.createEl("h2", { text: "Conflict Resolver" });
+		contentEl.createEl("h2", { text: "Conflict resolver" });
 
 		new Setting(contentEl)
-			.setName("Conflicting File")
+			.setName("Conflicting file")
 			.setDesc("Choose a conflicting file.")
 			.addSearch((search) => {
 				search
@@ -54,7 +54,7 @@ export class ConflictResolverModal extends Modal {
 
 	onClose() {
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		this.contentEl.empty();

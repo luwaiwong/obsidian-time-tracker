@@ -101,7 +101,7 @@ export class EditCategoryModal extends Modal {
 		if (!this.colorPickerContainer) return;
 
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 		}
 
 		this.colorPickerContainer.empty();
@@ -122,11 +122,11 @@ export class EditCategoryModal extends Modal {
 
 	onClose() {
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
 		}
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
@@ -149,16 +149,18 @@ export class EditCategoryModal extends Modal {
 		this.close();
 	}
 
-	async delete() {
+	delete() {
 		new ConfirmModal(
 			this.app,
 			`Delete category "${this.category.name}"? All projects in this category will be moved to Uncategorized.`,
-			async () => {
-				await this.plugin.categoryHandler.deleteCategory(this.category);
-				this.plugin.refreshViews();
-				this.onSave();
-				new Notice(`Category "${this.category.name}" deleted`);
-				this.close();
+			() => {
+				void (async () => {
+					await this.plugin.categoryHandler.deleteCategory(this.category);
+					this.plugin.refreshViews();
+					this.onSave();
+					new Notice(`Category "${this.category.name}" deleted`);
+					this.close();
+				})();
 			},
 		).open();
 	}

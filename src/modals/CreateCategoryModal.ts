@@ -33,7 +33,7 @@ export class CreateCategoryModal extends Modal {
 		this.headerEl.style.backgroundColor = this.colorInput;
 
 		const headerText = this.headerEl.createEl("span", { cls: "modal-header-text" });
-		headerText.textContent = "New Category";
+		headerText.textContent = "New category";
 
 		// Name input
 		const nameContainer = contentEl.createDiv({ cls: "modal-input-container" });
@@ -81,7 +81,7 @@ export class CreateCategoryModal extends Modal {
 		if (!this.colorPickerContainer) return;
 
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 		}
 
 		this.colorPickerContainer.empty();
@@ -101,11 +101,11 @@ export class CreateCategoryModal extends Modal {
 
 	onClose() {
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
 		}
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;

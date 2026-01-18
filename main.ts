@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf, requestUrl } from "obsidian";
+import { Notice, Plugin, TFile, WorkspaceLeaf, requestUrl } from "obsidian";
 import { TimeTrackerSettingTab } from "./src/settings";
 import {
 	TimeTrackerView,
@@ -21,6 +21,7 @@ import { ImportModal } from "./src/modals/ImportSTTModal";
 import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
 import { CategoryHandler } from "./src/handlers/categoryHandler";
+import { CreateRecordModal } from "./src/modals/CreateRecordModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	timesheetPath: "timesheet.csv",
@@ -85,38 +86,38 @@ export default class TimeTrackerPlugin extends Plugin {
 			VIEW_TYPE_ANALYTICS,
 			(leaf) => new AnalyticsView(leaf, this),
 		);
-		this.addRibbonIcon("clock", "Time Tracker", () => {
-			this.activateView();
+		this.addRibbonIcon("clock", "Time Tracker", async() => {
+			await this.activateView();
 		});
 
 		this.addCommand({
-			id: "open-time-tracker",
-			name: "Open Time Tracker",
-			callback: () => this.activateView(),
+			id: "open-time-tracking-view",
+			name: "Open time tracking view",
+			callback: async() => await this.activateView(),
 		});
 		this.addCommand({
-			id: "open-analytics",
-			name: "Open Analytics",
+			id: "open-analytics-view",
+			name: "Open analytics view",
 			callback: () => this.activateAnalyticsView(),
 		});
 		this.addCommand({
-			id: "toggle-last-timer",
-			name: "Toggle Last Used Timer",
-			callback: () => this.toggleLastTimer(),
+			id: "track-time",
+			name: "Track time",
+			callback: () => new CreateRecordModal(this.app, this, () => {}, false).open(),
 		});
 		this.addCommand({
-			id: "import-STT-data",
-			name: "Import Data from Simple Time Tracker",
+			id: "import-data",
+			name: "Import data from other apps",
 			callback: () => new ImportModal(this.app, this).open(),
 		});
 		this.addCommand({
 			id: "resolve-conflicts",
-			name: "Resolve Conflicts",
+			name: "Resolve conflicts",
 			callback: () => new ConflictResolverModal(this.app, this).open(),
 		});
 		this.addCommand({
-			id: "view-backups",
-			name: "View Backups",
+			id: "view-backups",	
+			name: "View backups",
 			callback: () => new BackupViewerModal(this.app, this).open(),
 		});
 
@@ -125,13 +126,13 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(async () => {
 			await this.loadPluginData();
 			await this.backupHandler.createBackup(this.settings.timesheetPath);
-			this.activateView();
+			await this.activateView();
 		});
 
 		// backup every 3 hours
 		this.registerInterval(
 			window.setInterval(
-				() => this.backupHandler.createBackup(this.settings.timesheetPath),
+				() => void this.backupHandler.createBackup(this.settings.timesheetPath),
 				3 * 60 * 60 * 1000,
 			),
 		);
@@ -139,14 +140,14 @@ export default class TimeTrackerPlugin extends Plugin {
 		// reload timesheet when app comes back to foreground for mobile
 		this.registerDomEvent(document, "visibilitychange", () => {
 			if (document.visibilityState === "visible") {
-				this.loadPluginData();
+				void this.loadPluginData();
 			}
 		});
 
 		// reload timesheet every 30 seconds
 		this.registerInterval(
 			window.setInterval(() => {
-				this.loadPluginData();
+				void this.loadPluginData();
 			}, 0.5 * 60 * 1000),
 		);
 	}
@@ -156,6 +157,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			await this.loadTimesheet();
 			await this.loadTimeblocks();
 		} catch (err) {
+			new Notice("Error loading plugin data: " + err);
 		}
 	}
 
@@ -164,8 +166,8 @@ export default class TimeTrackerPlugin extends Plugin {
 		await this.saveTimeblocks();
 	}
 
-	async onunload() {
-		await this.savePluginData();
+	onunload() {
+		void this.savePluginData();
 	}
 
 	// ----- LOADING DATA -----
@@ -173,8 +175,8 @@ export default class TimeTrackerPlugin extends Plugin {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData(),
-		);
+			await this.loadData() || {},
+		) as PluginSettings;
 	}
 
 	async saveSettings() {
@@ -289,6 +291,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			this.timeblocksData = newData;
 			this.refreshViews();
 		} catch (err) {
+			new Notice("Error loading Timeblocks: " + err);
 		}
 	}
 
@@ -301,6 +304,7 @@ export default class TimeTrackerPlugin extends Plugin {
 				this.timeblocksData,
 			);
 		} catch (err) {
+			new Notice("Error saving Timeblocks: " + err);
 		}
 	}
 
@@ -353,7 +357,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	 * can only be used when retroactive mode is off
 	 * @param title - The title of the task being tracked
 	 */
-	startTimerWithoutProject(title: string = "") {
+	async startTimerWithoutProject(title: string = "") {
 		if (this.settings.retroactiveTrackingEnabled) {
 			throw new Error(
 				"Cannot start timer without project in retroactive mode",
@@ -362,7 +366,7 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		const now = new Date();
 
-		this.stopAllTimers();
+		await this.stopAllTimers();
 
 		// Create a new record with null endTime (running timer) and empty projectName
 		const newRecord: TimeRecord = {
@@ -374,12 +378,12 @@ export default class TimeTrackerPlugin extends Plugin {
 		};
 		this.timesheetData.records.push(newRecord);
 
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		this.refreshViews();
 	}
 
 	/** start tracking time for a project */
-	startTimer(
+	async startTimer(
 		projectId: number = -1,
 		title: string = "",
 		startTime?: Date,
@@ -424,7 +428,7 @@ export default class TimeTrackerPlugin extends Plugin {
 				}
 			}
 		} else {
-			this.stopAllTimers();
+			await this.stopAllTimers();
 
 			// check if this project is already running
 			const existingTimer = this.runningTimers.find(
@@ -432,7 +436,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			);
 
 			if (existingTimer) {
-				this.stopTimer(existingTimer.id);
+				await this.stopTimer(existingTimer.id);
 			} else {
 				// create a new record with null endTime (running timer)
 				const newRecord: TimeRecord = {
@@ -446,12 +450,12 @@ export default class TimeTrackerPlugin extends Plugin {
 			}
 		}
 
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		this.refreshViews();
 	}
 
 	/** find record by ID and extend its time */
-	repeatRecord(recordId: number, endTime: Date) {
+	async repeatRecord(recordId: number, endTime: Date) {
 		const record = this.timesheetData.records.find((r) => r.id === recordId);
 		if (!record) return;
 
@@ -465,7 +469,7 @@ export default class TimeTrackerPlugin extends Plugin {
 				);
 				if (index !== -1) {
 					this.timesheetData.records[index].endTime = new Date();
-					this.saveTimesheet();
+					await this.saveTimesheet();
 					this.refreshViews();
 				}
 			} else {
@@ -479,29 +483,31 @@ export default class TimeTrackerPlugin extends Plugin {
 					title: record.title,
 				};
 				this.timesheetData.records.push(newRecord);
-				this.saveTimesheet();
+				await this.saveTimesheet();
 				this.refreshViews();
 			}
 		} else {
 			if (record.projectId) {
-				this.startTimer(record.projectId);
+				await this.startTimer(record.projectId);
 				setTimeout(() => {
-					const runningRecord = this.timesheetData.records.find(
-						(r) => r.projectId === record.projectId && r.endTime === null,
-					);
-					if (runningRecord) {
-						runningRecord.title = record.title;
-						this.saveTimesheet();
-					}
+					void (async () => {
+						const runningRecord = this.timesheetData.records.find(
+							(r) => r.projectId === record.projectId && r.endTime === null,
+						);
+						if (runningRecord) {
+							runningRecord.title = record.title;
+							await this.saveTimesheet();
+						}
+					})();
 				}, 100);
 			} else {
-				this.startTimerWithoutProject(record.title);
+				await this.startTimerWithoutProject(record.title);
 			}
 		}
 	}
 
 	/** stop a specific timer by record ID */
-	stopTimer(recordId: number) {
+	async stopTimer(recordId: number) {
 		const recordIndex = this.timesheetData.records.findIndex(
 			(r) => r.id === recordId && r.endTime === null,
 		);
@@ -510,7 +516,7 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		this.timesheetData.records[recordIndex].endTime = new Date();
 
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		this.refreshViews();
 	}
 
@@ -518,7 +524,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	 * edit a specific record
 	 * returns true if the record was successfully edited
 	 */
-	editRecord(id: number, changes: TimeRecord): boolean {
+	async editRecord(id: number, changes: TimeRecord): Promise<boolean> {
 		const recordIndex = this.timesheetData.records.findIndex(
 			(r) => r.id === id,
 		);
@@ -529,13 +535,13 @@ export default class TimeTrackerPlugin extends Plugin {
 			...changes,
 		};
 
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		// this.refreshViews();
 		return true;
 	}
 
 	/** stop all running timers */
-	stopAllTimers() {
+	async stopAllTimers() {
 		const now = new Date();
 		for (const record of this.timesheetData.records) {
 			if (record.endTime === null) {
@@ -543,7 +549,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			}
 		}
 
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		// this.refreshViews();
 	}
 
@@ -564,7 +570,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	/** toggle the last used timer */
-	toggleLastTimer() {
+	async toggleLastTimer() {
 		const lastRecord = this.getLastStoppedRecord();
 		if (!lastRecord) return;
 
@@ -579,10 +585,10 @@ export default class TimeTrackerPlugin extends Plugin {
 				(r) => r.projectId === project.id,
 			);
 			if (runningRecord) {
-				this.stopTimer(runningRecord.id);
+				await this.stopTimer(runningRecord.id);
 			}
 		} else {
-			this.startTimer(project.id);
+			await this.startTimer(project.id);
 		}
 	}
 
@@ -592,13 +598,13 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	/** update a record's title */
-	updateRecordTitle(recordId: number, title: string): void {
+	async updateRecordTitle(recordId: number, title: string): Promise<void> {
 		const index = this.timesheetData.records.findIndex(
 			(r) => r.id === recordId,
 		);
 		if (index !== -1) {
 			this.timesheetData.records[index].title = title;
-			this.saveTimesheet();
+			await this.saveTimesheet();
 		}
 	}
 
@@ -631,14 +637,14 @@ export default class TimeTrackerPlugin extends Plugin {
 		return response.text;
 	}
 
-	editProject(project: Project): void {
+	async editProject(project: Project): Promise<void> {
 		const index = this.timesheetData.projects.findIndex(
 			(p) => p.id === project.id,
 		);
 		if (index !== -1) {
 			this.timesheetData.projects[index] = project;
 		}
-		this.saveTimesheet();
+		await this.saveTimesheet();
 		// this.refreshViews();
 	}
 
@@ -663,7 +669,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
@@ -686,7 +692,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 

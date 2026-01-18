@@ -1,10 +1,18 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { App, ItemView, WorkspaceLeaf } from "obsidian";
 import type TimeTrackerPlugin from "../../main";
 import ControlBar from "../components/ControlBar.svelte";
 import Schedule from "../components/Schedule.svelte";
 import { mount, unmount } from "svelte";
 import { EditRecordModal } from "..//modals/EditRecordModal";
-import { Project, TimeRecord } from "src/types";
+import { TimeRecord } from "src/types";
+
+// stupid thing to hide error
+interface AppWithSetting extends App {
+	setting?: {
+		open: () => void;
+		openTabById: (id: string) => void;
+	};
+}
 
 export const VIEW_TYPE_TIME_TRACKER = "time-tracker-view";
 
@@ -24,7 +32,7 @@ export class TimeTrackerView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Time Tracker";
+		return "Time tracker";
 	}
 
 	getIcon(): string {
@@ -59,13 +67,12 @@ export class TimeTrackerView extends ItemView {
 				plugin: this.plugin,
 				runningTimers: this.plugin.runningTimers || [],
 				onOpenAnalytics: () => {
-					this.plugin.activateAnalyticsView();
+					void this.plugin.activateAnalyticsView();
 				},
 				onOpenSettings: () => {
-					// @ts-ignore
-					this.plugin.app.setting.open();
-					// @ts-ignore
-					this.plugin.app.setting.openTabById("time-tracker");
+					const app = this.plugin.app as AppWithSetting;
+					app.setting?.open();
+					app.setting?.openTabById("time-tracker");
 				},
 				onRefresh: () => {
 					this.refresh();
@@ -82,16 +89,15 @@ export class TimeTrackerView extends ItemView {
 			props: {
 				plugin: this.plugin,
 				onRefresh: () => {
-					this.onScheduleRefresh();
+					void this.onScheduleRefresh();
 				},
 				onOpenAnalytics: () => {
-					this.plugin.activateAnalyticsView();
+					void this.plugin.activateAnalyticsView();
 				},
 				onOpenSettings: () => {
-					// @ts-ignore
-					this.plugin.app.setting.open();
-					// @ts-ignore
-					this.plugin.app.setting.openTabById("time-tracker");
+					const app = this.plugin.app as AppWithSetting;
+					app.setting?.open();
+					app.setting?.openTabById("time-tracker");
 				},
 				onEditRecord: (record: TimeRecord) => {
 					new EditRecordModal(
@@ -99,7 +105,7 @@ export class TimeTrackerView extends ItemView {
 						this.plugin,
 						record,
 						() => {
-							this.refresh();
+							void this.refresh();
 						},
 					).open();
 				},
@@ -108,27 +114,27 @@ export class TimeTrackerView extends ItemView {
 	}
 
 	async onScheduleRefresh() {
-		this.plugin.loadTimesheet();
-		this.refresh();
+		void this.plugin.loadTimesheet();
+		void this.refresh();
 	}
 
 	async onClose() {
 		if (this.headerComponent) {
-			unmount(this.headerComponent);
+			void unmount(this.headerComponent);
 			this.headerComponent = null;
 		}
 		if (this.scheduleComponent) {
-			unmount(this.scheduleComponent);
+			void unmount(this.scheduleComponent);
 			this.scheduleComponent = null;
 		}
 		if (this.summaryComponent) {
-			unmount(this.summaryComponent);
+			void unmount(this.summaryComponent);
 			this.summaryComponent = null;
 		}
 	}
 
 	refresh() {
-		this.onClose();
-		this.onOpen();
+		void this.onClose();
+		void this.onOpen();
 	}
 }

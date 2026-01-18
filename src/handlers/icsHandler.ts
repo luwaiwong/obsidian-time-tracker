@@ -22,8 +22,8 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 				// yield before heavy parsing
 				await yieldToMain();
 
-				const jcalData = ICAL.parse(text);
-				const comp = new ICAL.Component(jcalData);
+				const jcalData = ICAL.parse(text) as string;
+				const comp = new ICAL.Component(jcalData );
 				const calName = comp.getFirstPropertyValue("x-wr-calname") as string;
 				let sourceName = "ICS";
 				if (calName) {
@@ -38,7 +38,8 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 						} else {
 							sourceName = urlObj.hostname.replace("www.", "");
 						}
-					} catch(e) {
+					} catch (e) {
+						new Notice("Error fetching ICS calendars: " + e);
 						sourceName = "ICS Calendar";
 					}
 				}
@@ -82,6 +83,7 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 					}
 				}
 			} catch (err) {
+				new Notice("Error fetching ICS calendars: " + err);
 			}
 		}
 

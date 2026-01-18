@@ -24,7 +24,7 @@ export class BackupViewerModal extends Modal {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("backup-viewer-modal");
 
-		contentEl.createEl("h2", { text: "Timesheet Backups" });
+		contentEl.createEl("h2", { text: "Timesheet backups" });
 
 		const backups = await this.backupHandler.listBackups();
 
@@ -37,10 +37,12 @@ export class BackupViewerModal extends Modal {
 		}
 
 		this.backupListContainer = contentEl.createDiv("backup-list-container");
-		this.backupListContainer.style.display = "flex";
-		this.backupListContainer.style.flexDirection = "column";
-		this.backupListContainer.style.gap = "12px";
-		this.backupListContainer.style.marginTop = "16px";
+		this.backupListContainer.setCssProps({
+			display: "flex",
+			flexDirection: "column",
+			gap: "12px",
+			marginTop: "16px",
+		});
 
 		await this.renderBackups(backups);
 	}
@@ -51,7 +53,7 @@ export class BackupViewerModal extends Modal {
 		if (!this.backupListContainer) return;
 
 		for (const component of this.cardComponents) {
-			unmount(component);
+			void unmount(component);
 		}
 		this.cardComponents = [];
 		this.backupListContainer.empty();
@@ -121,7 +123,7 @@ export class BackupViewerModal extends Modal {
 
 	onClose() {
 		for (const component of this.cardComponents) {
-			unmount(component);
+			void unmount(component);
 		}
 		this.cardComponents = [];
 		const { contentEl } = this;

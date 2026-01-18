@@ -148,7 +148,7 @@ export class EditProjectModal extends Modal {
 		if (!this.colorPickerContainer) return;
 
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 		}
 
 		this.colorPickerContainer.empty();
@@ -169,11 +169,11 @@ export class EditProjectModal extends Modal {
 
 	onClose() {
 		if (this.colorPickerComponent) {
-			unmount(this.colorPickerComponent);
+			void unmount(this.colorPickerComponent);
 			this.colorPickerComponent = null;
 		}
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		const { contentEl } = this;
@@ -191,7 +191,7 @@ export class EditProjectModal extends Modal {
 		this.project.color = this.colorInput;
 		this.project.categoryId = this.categoryId;
 
-		this.plugin.editProject(this.project);
+		await this.plugin.editProject(this.project);
 		
 		this.onSave();
 		this.close();
@@ -201,7 +201,8 @@ export class EditProjectModal extends Modal {
 		new ConfirmModal(
 			this.app,
 			`Delete project "${this.project.name}"? All time records will be kept.`,
-			async () => {
+			() => {
+				void (async () => {
 				this.plugin.timesheetData.projects =
 					this.plugin.timesheetData.projects.filter(
 						(p) => p.id !== this.project.id,
@@ -212,6 +213,7 @@ export class EditProjectModal extends Modal {
 				this.onSave();
 				new Notice(`Project "${this.project.name}" deleted`);
 				this.close();
+			})();
 			},
 		).open();
 	}

@@ -38,7 +38,7 @@ export class ConfirmModal extends Modal {
 
 	onClose() {
 		if (this.actionButtonsComponent) {
-			unmount(this.actionButtonsComponent);
+			void unmount(this.actionButtonsComponent);
 			this.actionButtonsComponent = null;
 		}
 		this.contentEl.empty();
