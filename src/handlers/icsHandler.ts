@@ -2,6 +2,7 @@
 import ICAL from "ical.js";
 import TimeTrackerPlugin from "main";
 import { Notice } from "obsidian";
+import type { IcsCalendarEvent } from "../types";
 import { yieldToMain } from "../utils/styleUtils";
 
 export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
@@ -10,7 +11,7 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 	}
 
 	plugin.icsCache.loading = true;
-	const events: any[] = [];
+	const events: IcsCalendarEvent[] = [];
 
 	try {
 		for (const url of plugin.settings.icsCalendars) {
@@ -69,7 +70,7 @@ export async function fetchIcsCalendars(plugin: TimeTrackerPlugin) {
 								isIcs: true,
 								description: event.description || "",
 								location: event.location || "",
-								url: vevent.getFirstPropertyValue("url") || "",
+								url: String(vevent.getFirstPropertyValue("url") || ""),
 								color: icsColor,
 								sourceName: sourceName,
 							},

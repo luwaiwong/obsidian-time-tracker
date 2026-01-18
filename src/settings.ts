@@ -9,7 +9,7 @@ import { EditCategoryModal } from "./modals/EditCategoryModal";
 
 export class TimeTrackerSettingTab extends PluginSettingTab {
 	plugin: TimeTrackerPlugin;
-	private projectGridComponent: Record<string, any> | null = null;
+	private projectGridComponent: Record<string, unknown> | null = null;
 
 	constructor(app: App, plugin: TimeTrackerPlugin) {
 		super(app, plugin);

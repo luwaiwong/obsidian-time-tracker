@@ -90,3 +90,58 @@ export interface TimelineEntry {
 }
 
 export type CSVLineType = "record" | "project" | "category";
+
+// calendar event types for FullCalendar
+export interface IcsCalendarEvent {
+	id: string;
+	title: string;
+	start: Date;
+	end: Date;
+	backgroundColor: string;
+	borderColor: string;
+	borderWidth: string;
+	classNames: string[];
+	extendedProps: {
+		isIcs: true;
+		description: string;
+		location: string;
+		url: string;
+		color: string;
+		sourceName: string;
+	};
+}
+
+export interface TrackedCalendarEvent {
+	id: string;
+	title: string;
+	start: Date;
+	end: Date;
+	backgroundColor: string;
+	borderColor: string;
+	extendedProps: {
+		project: Project;
+		duration: number;
+		isRunning: boolean;
+		record?: TimeRecord;
+	};
+}
+
+export interface TimeblockCalendarEvent {
+	id: string;
+	title: string;
+	start: Date;
+	end: Date;
+	backgroundColor: string;
+	borderColor: string;
+	classNames: string[];
+	editable: boolean;
+	durationEditable: boolean;
+	extendedProps: {
+		isTimeblock: true;
+		timeblock: Timeblock;
+		color: string;
+		duration: number;
+	};
+}
+
+export type CalendarEvent = IcsCalendarEvent | TrackedCalendarEvent | TimeblockCalendarEvent;

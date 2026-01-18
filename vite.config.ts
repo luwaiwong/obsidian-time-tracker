@@ -4,7 +4,7 @@ import builtins from "builtin-modules";
 import { PluginOption, defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
-const DEV_DIRECTORY = "./";
+const DEV_DIRECTORY = "../../.md";
 
 const setOutDir = (mode: string) => {
 	switch (mode) {

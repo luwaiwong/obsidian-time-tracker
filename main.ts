@@ -15,6 +15,7 @@ import type {
 	TimeRecord,
 	Project,
 	Timeblock,
+	IcsCalendarEvent,
 } from "./src/types";
 import { ImportModal } from "./src/modals/ImportSTTModal";
 import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
@@ -60,7 +61,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	isLoading: boolean = true;
 
 	// cache ics events, dont fetch every time schedule refreshed
-	icsCache: { events: any[]; fetched: boolean; loading: boolean } = {
+	icsCache: { events: IcsCalendarEvent[]; fetched: boolean; loading: boolean } = {
 		events: [],
 		fetched: false,
 		loading: false,

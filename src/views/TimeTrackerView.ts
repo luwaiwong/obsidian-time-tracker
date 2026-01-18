@@ -10,9 +10,9 @@ export const VIEW_TYPE_TIME_TRACKER = "time-tracker-view";
 
 export class TimeTrackerView extends ItemView {
 	plugin: TimeTrackerPlugin;
-	private scheduleComponent: Record<string, any> | null = null;
-	private summaryComponent: Record<string, any> | null = null;
-	private headerComponent: Record<string, any> | null = null;
+	private scheduleComponent: Record<string, unknown> | null = null;
+	private summaryComponent: Record<string, unknown> | null = null;
+	private headerComponent: Record<string, unknown> | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: TimeTrackerPlugin) {
 		super(leaf);

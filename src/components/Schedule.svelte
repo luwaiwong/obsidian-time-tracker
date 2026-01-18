@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type TimeTrackerPlugin from "../../main";
-	import type { Project, TimeRecord, Timeblock } from "../types";
+	import type { Project, TimeRecord, Timeblock, IcsCalendarEvent, TrackedCalendarEvent, TimeblockCalendarEvent, CalendarEvent } from "../types";
 	import { formatNaturalDuration } from "../utils/timeUtils";
 	import { icon, yieldToMain } from "../utils/styleUtils";
 	import { Calendar } from "@fullcalendar/core";
@@ -33,7 +33,7 @@
 	let records = $derived(plugin.timesheetData?.records ?? []);
 	let timeblocks = $derived(plugin.timeblocksData?.timeblocks ?? []);
 
-	let icsEvents = $state<any[]>(plugin.icsCache.events);
+	let icsEvents = $state<IcsCalendarEvent[]>(plugin.icsCache.events);
 	let icsLoading = $state(false);
 	let zoomLevel = $state(plugin.settings.scheduleZoom);
 	let isUpdatingCalendar = false;
@@ -101,7 +101,7 @@
 	}
 
 	function buildCalendarEvents() {
-		const events: any[] = [];
+		const events: (TrackedCalendarEvent | TimeblockCalendarEvent)[] = [];
 		const { start, end } = getDayRange(selectedDate);
 
 		// Process completed records
@@ -176,7 +176,7 @@
 		return events;
 	}
 
-	function buildTimeblockEvent(timeblock: Timeblock, start?: Date, end?: Date) {
+	function buildTimeblockEvent(timeblock: Timeblock, start?: Date, end?: Date): TimeblockCalendarEvent {
 		const color = timeblock.color;
 		const eventStart = start ?? timeblock.startTime;
 		const eventEnd = end ?? timeblock.endTime;
@@ -267,11 +267,11 @@
 			const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
 
 			// collect events to add
-			const eventsToAdd: any[] = [];
+			const eventsToAdd: CalendarEvent[] = [];
 			for (const newEvent of allEvents) {
 				const existing = currentEventsMap.get(newEvent.id);
 				if (existing) {
-					if (newEvent.extendedProps?.isRunning) {
+					if ('isRunning' in newEvent.extendedProps && newEvent.extendedProps.isRunning) {
 						existing.setEnd(newEvent.end);
 					}
 				} else {
