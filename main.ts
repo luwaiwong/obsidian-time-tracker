@@ -18,7 +18,6 @@ import type {
 	IcsCalendarEvent,
 } from "./src/types";
 import { ImportModal } from "./src/modals/ImportSTTModal";
-import { ConflictResolverModal } from "./src/modals/ConflictResolverModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
 import { CategoryHandler } from "./src/handlers/categoryHandler";
 import { CreateRecordModal } from "./src/modals/CreateRecordModal";

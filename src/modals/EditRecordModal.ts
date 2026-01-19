@@ -302,7 +302,7 @@ export class EditRecordModal extends Modal {
 		});
 	}
 
-	async createNew() {
+	createNew() {
 		this.close();
 		new CreateRecordModal(this.app, this.plugin, this.onSave, false, this.titleInput, this.selectedProject ? this.selectedProject : undefined).open();
 	}
