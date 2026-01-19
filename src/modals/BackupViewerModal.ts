@@ -16,7 +16,7 @@ export class BackupViewerModal extends Modal {
 	constructor(app: App, plugin: TimeTrackerPlugin) {
 		super(app);
 		this.plugin = plugin;
-		this.backupHandler = new BackupHandler(this.app.vault);
+		this.backupHandler = new BackupHandler(this.app);
 		this.csvHandler = new CSVHandler(this.app.vault);
 	}
 

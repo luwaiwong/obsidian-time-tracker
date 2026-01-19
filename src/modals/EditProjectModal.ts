@@ -66,7 +66,7 @@ export class EditProjectModal extends Modal {
 
 		// icon input
 		const iconContainer = contentEl.createDiv({ cls: "modal-input-container" });
-		iconContainer.createEl("label", { text: "Icon/Emoji", cls: "modal-input-label" });
+		iconContainer.createEl("label", { text: "Icon/emoji", cls: "modal-input-label" });
 
 		const iconInputEl = iconContainer.createEl("input", {
 			type: "text",

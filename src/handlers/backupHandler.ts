@@ -1,11 +1,17 @@
-import { Notice, TFile, Vault } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 
 const BACKUP_FOLDER = ".timebackups";
 const BACKUP_RETENTION_DAYS = 5;
 const BACKUP_RETENTION_MS = BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 export class BackupHandler {
-	constructor(private vault: Vault) {}
+	private vault;
+	private fileManager;
+
+	constructor(private app: App) {
+		this.vault = app.vault;
+		this.fileManager = app.fileManager;
+	}
 
 	private formatTimestamp(date: Date): string {
 		const year = date.getFullYear();
@@ -145,7 +151,7 @@ export class BackupHandler {
 					if (file instanceof TFile) {
 						const stat = await this.vault.adapter.stat(fullPath);
 						if (stat && stat.mtime && stat.mtime < cutoffTime) {
-							await this.vault.delete(file);
+							await this.fileManager.trashFile(file);
 						}
 					}
 				} catch (err) {

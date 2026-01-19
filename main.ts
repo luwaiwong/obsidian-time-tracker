@@ -74,7 +74,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.csvHandler = new CSVHandler(this.app.vault);
-		this.backupHandler = new BackupHandler(this.app.vault);
+		this.backupHandler = new BackupHandler(this.app);
 		this.timeblocksHandler = new TimeblocksHandler(this.app.vault);
 		this.categoryHandler = new CategoryHandler(this);
 		
@@ -86,7 +86,7 @@ export default class TimeTrackerPlugin extends Plugin {
 			VIEW_TYPE_ANALYTICS,
 			(leaf) => new AnalyticsView(leaf, this),
 		);
-		this.addRibbonIcon("clock", "Time Tracker", async() => {
+		this.addRibbonIcon("clock", "Time tracker", async() => {
 			await this.activateView();
 		});
 

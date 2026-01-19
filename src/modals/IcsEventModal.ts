@@ -85,7 +85,7 @@ export class IcsEventModal extends Modal {
 			const linkContainer = contentEl.createDiv();
 			linkContainer.setCssProps({ marginTop: "16px" });
 			const linkEl = linkContainer.createEl("a", {
-				text: "🔗 Open link",
+				text: "Open link",
 				href: this.data.url,
 			});
 			linkEl.setCssProps({ color: "var(--interactive-accent)" });

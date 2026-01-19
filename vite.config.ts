@@ -1,6 +1,8 @@
-import { pathToFileURL } from "url";
+// eslint-disable-next-line import/no-nodejs-modules
+import { pathToFileURL } from "node:url";
+// eslint-disable-next-line import/no-nodejs-modules
+import { builtinModules } from "node:module";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import builtins from "builtin-modules";
 import { PluginOption, defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -32,6 +34,7 @@ export default defineConfig(({ mode }) => {
 					assetFileNames: "styles.css",
 				},
 				sourcemapBaseUrl: pathToFileURL(
+					// eslint-disable-next-line obsidianmd/hardcoded-config-path
 					"~/.md/.obsidian/plugins/obsidian-time-tracker",
 				).toString(),
 				external: [
@@ -48,7 +51,7 @@ export default defineConfig(({ mode }) => {
 					"@lezer/common",
 					"@lezer/highlight",
 					"@lezer/lr",
-					...builtins,
+					...builtinModules,
 				],
 			},
 			outDir: setOutDir(mode),
