@@ -39,7 +39,7 @@ export class TimeTrackerView extends ItemView {
 		return "clock";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 		container.addClass("time-tracker-view");
@@ -48,14 +48,14 @@ export class TimeTrackerView extends ItemView {
 		if (this.plugin.isLoading) {
 			const loadingDiv = container.createDiv("time-tracker-loading");
 			loadingDiv.setText("Loading timesheet...");
-			return;
+			return Promise.resolve();
 		}
 
 		// Show error if there was a problem loading
 		if (this.plugin.error) {
 			const errorDiv = container.createDiv("time-tracker-error");
 			errorDiv.setText(this.plugin.error);
-			return;
+			return Promise.resolve();
 		}
 
 		// Header with buttons and timer
@@ -111,14 +111,16 @@ export class TimeTrackerView extends ItemView {
 				},
 			},
 		});
+
+		return Promise.resolve();
 	}
 
 	async onScheduleRefresh() {
-		void this.plugin.loadTimesheet();
-		void this.refresh();
+		await this.plugin.loadTimesheet();
+		this.refresh();
 	}
 
-	async onClose() {
+	onClose() {
 		if (this.headerComponent) {
 			void unmount(this.headerComponent);
 			this.headerComponent = null;
@@ -131,6 +133,7 @@ export class TimeTrackerView extends ItemView {
 			void unmount(this.summaryComponent);
 			this.summaryComponent = null;
 		}
+		return Promise.resolve();
 	}
 
 	refresh() {

@@ -197,7 +197,7 @@ export class EditProjectModal extends Modal {
 		this.close();
 	}
 
-	async delete() {
+	delete() {
 		new ConfirmModal(
 			this.app,
 			`Delete project "${this.project.name}"? All time records will be kept.`,

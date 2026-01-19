@@ -111,11 +111,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			callback: () => new ImportModal(this.app, this).open(),
 		});
 		this.addCommand({
-			id: "resolve-conflicts",
-			name: "Resolve conflicts",
-			callback: () => new ConflictResolverModal(this.app, this).open(),
-		});
-		this.addCommand({
 			id: "view-backups",	
 			name: "View backups",
 			callback: () => new BackupViewerModal(this.app, this).open(),

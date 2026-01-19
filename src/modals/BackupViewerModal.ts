@@ -44,10 +44,10 @@ export class BackupViewerModal extends Modal {
 			marginTop: "16px",
 		});
 
-		await this.renderBackups(backups);
+		this.renderBackups(backups);
 	}
 
-	private async renderBackups(
+	private renderBackups(
 		backups: Array<{ path: string; name: string; size: number; mtime: number }>,
 	) {
 		if (!this.backupListContainer) return;
@@ -104,7 +104,7 @@ export class BackupViewerModal extends Modal {
 			new Notice("Backup deleted successfully");
 
 			const backups = await this.backupHandler.listBackups();
-			await this.renderBackups(backups);
+			this.renderBackups(backups);
 		} catch (err) {
 			new Notice("Error deleting backup: " + err);
 		}

@@ -26,7 +26,7 @@ export class AnalyticsView extends ItemView {
 		return "bar-chart";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 		container.addClass("time-tracker-analytics-view");
@@ -35,14 +35,14 @@ export class AnalyticsView extends ItemView {
 		if (this.plugin.isLoading) {
 			const loadingDiv = container.createDiv("time-tracker-loading");
 			loadingDiv.setText("Loading timesheet...");
-			return;
+			return Promise.resolve();
 		}
 
 		// Show error if there was a problem loading
 		if (this.plugin.error) {
 			const errorDiv = container.createDiv("time-tracker-error");
 			errorDiv.setText(this.plugin.error);
-			return;
+			return Promise.resolve();
 		}
 
 		this.component = mount(Analytics, {
@@ -51,13 +51,16 @@ export class AnalyticsView extends ItemView {
 				plugin: this.plugin,
 			},
 		});
+
+		return Promise.resolve();
 	}
 
-	async onClose() {
+	 onClose() {
 		if (this.component) {
 			void unmount(this.component);
 			this.component = null;
 		}
+		return Promise.resolve();
 	}
 
 	refresh() {

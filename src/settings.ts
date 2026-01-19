@@ -326,7 +326,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 					button
 						.setIcon("pencil")
 						.setTooltip("Rename category")
-						.onClick(async () => {
+						.onClick(() => {
 							new EditCategoryModal(this.app, this.plugin, category, () => {
 								this.display();
 							}).open();
