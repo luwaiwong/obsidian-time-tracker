@@ -6,14 +6,12 @@
 	}
 
 	interface Props {
-		primaryButton: ButtonConfig;
-		cancelButton?: { text?: string; onClick: () => void };
+		rightButtons?: ButtonConfig[];
 		leftButtons?: ButtonConfig[];
 	}
 
 	let {
-		primaryButton,
-		cancelButton,
+		rightButtons = [],
 		leftButtons = [],
 	}: Props = $props();
 
@@ -48,7 +46,16 @@
 	{/if}
 
 	<div style="display: flex; gap: 8px;">
-		{#if cancelButton}
+		{#each rightButtons as btn}
+			<button
+				type="button"
+				class={getButtonClass(btn.variant)}
+				onclick={(e) => handleClick(e, btn.onClick)}
+			>
+				{btn.text}
+			</button>
+		{/each}
+		<!-- {#if cancelButton}
 			<button
 				type="button"
 				onclick={(e) => handleClick(e, cancelButton!.onClick)}
@@ -62,6 +69,6 @@
 			onclick={(e) => handleClick(e, primaryButton.onClick)}
 		>
 			{primaryButton.text}
-		</button>
+		</button> -->
 	</div>
 </div>

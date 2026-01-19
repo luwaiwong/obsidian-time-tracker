@@ -23,15 +23,21 @@ export class ConfirmModal extends Modal {
 		this.actionButtonsComponent = mount(ModalActionButtons, {
 			target: buttonContainer,
 			props: {
-				primaryButton: {
-					text: "Delete",
-					onClick: () => {
-						this.onConfirm();
-						this.close();
+				rightButtons: [
+					{
+						text: "Cancel",
+						onClick: () => this.close(),
+						variant: "default",
 					},
-					variant: "warning",
-				},
-				cancelButton: { onClick: () => this.close() },
+					{
+						text: "Delete",
+						onClick: () => {
+							this.onConfirm();
+							this.close();
+						},
+						variant: "warning",
+					},
+				],
 			},
 		});
 	}

@@ -126,12 +126,18 @@ export class CreateProjectModal extends Modal {
 		this.actionButtonsComponent = mount(ModalActionButtons, {
 			target: buttonContainer,
 			props: {
-				primaryButton: {
-					text: this.project ? "Save" : "Create",
-					onClick: () => this.save(),
-					variant: "cta",
-				},
-				cancelButton: { onClick: () => this.close() },
+				rightButtons: [
+					{
+						text: "Cancel",
+						onClick: () => this.close(),
+						variant: "default",
+					},
+					{
+						text: this.project ? "Save" : "Create",
+						onClick: () => this.save(),
+						variant: "cta",
+					},
+				],
 			},
 		});
 	}

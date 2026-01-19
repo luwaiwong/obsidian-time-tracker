@@ -8,6 +8,7 @@ import TimeGrid from "../components/TimeGrid.svelte";
 import TextInput from "../components/TextInput.svelte";
 import Cards from "../components/Cards.svelte";
 import { mountMiniTitle, mountSpacer } from "../utils/styleUtils";
+import { CreateRecordModal } from "./CreateRecordModal";
 
 
 export class EditRecordModal extends Modal {
@@ -148,12 +149,23 @@ export class EditRecordModal extends Modal {
 		this.actionButtonsComponent = mount(ModalActionButtons, {
 			target: buttonContainer,
 			props: {
-				primaryButton: {
-					text: "Save",
-					onClick: () => this.save(),
-					variant: "cta",
-				},
-				cancelButton: { onClick: () => this.close() },
+				rightButtons: [
+					{
+						text: "Cancel",
+						onClick: () => this.close(),
+						variant: "default",
+					},
+					{
+						text: "Create New Record",
+						onClick: () => this.createNew(),
+						variant: "default",
+					},
+					{
+						text: "Save",
+						onClick: () => this.save(),
+						variant: "cta",
+					},
+				],
 				leftButtons: [
 					{ text: "Delete", onClick: () => this.delete(), variant: "warning" },
 				],
@@ -289,6 +301,12 @@ export class EditRecordModal extends Modal {
 			},
 		});
 	}
+
+	async createNew() {
+		this.close();
+		new CreateRecordModal(this.app, this.plugin, this.onSave, false, this.titleInput, this.selectedProject ? this.selectedProject : undefined).open();
+	}
+
 	async save() {
 		const index = this.plugin.timesheetData.records.findIndex(
 			(r) => r.id === this.record.id,

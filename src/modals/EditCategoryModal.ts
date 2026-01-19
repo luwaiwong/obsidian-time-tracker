@@ -74,15 +74,21 @@ export class EditCategoryModal extends Modal {
 		this.actionButtonsComponent = mount(ModalActionButtons, {
 			target: buttonContainer,
 			props: {
-				primaryButton: {
-					text: "Save",
-					onClick: () => this.save(),
-					variant: "cta",
-				},
-				cancelButton: { onClick: () => this.close() },
 				leftButtons: [
 					{ text: "Delete", onClick: () => this.delete(), variant: "warning" },
 					{ text: this.category.archived ? "Unarchive" : "Archive", onClick: () => this.toggleArchive() },
+				],
+				rightButtons: [
+					{
+						text: "Cancel",
+						onClick: () => this.close(),
+						variant: "default",
+					},
+					{
+						text: "Save",
+						onClick: () => this.save(),
+						variant: "cta",
+					},
 				],
 			},
 		});

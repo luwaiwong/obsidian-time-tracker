@@ -40,14 +40,21 @@ export class ConflictResolverModal extends Modal {
 		this.actionButtonsComponent = mount(ModalActionButtons, {
 			target: buttonContainer,
 			props: {
-				primaryButton: {
-					text: "Resolve",
-					onClick: () => {
-						this.resolveConflict(this.folderLocation);
-						this.close();
+				rightButtons: [
+					{
+						text: "Cancel",
+						onClick: () => this.close(),
+						variant: "default",
 					},
-					variant: "cta",
-				},
+					{
+						text: "Resolve",
+						onClick: () => {
+							this.resolveConflict(this.folderLocation);
+							this.close();
+						},
+						variant: "cta",
+					},
+				],
 			},
 		});
 	}
