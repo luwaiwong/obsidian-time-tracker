@@ -4,6 +4,7 @@
 	import {
 		formatDuration,
 		formatNaturalDuration,
+		getCategoryDuration,
 		getProjectDuration,
 		getTimeRange,
 	} from "../utils/timeUtils";
@@ -600,25 +601,43 @@
 			</div>
 			<!-- list of projects sorted by duration -->
 			<div class="flex justify-start flex-col items-start gap-2 pt-4">
-				{#each 
-					filteredProjects.sort(
-						(a, b) => getProjectDuration(b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getProjectDuration(a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as project}
-					{#if getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0}
-						<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)"
-							>
+				{#if !showByCategory}
+					{#each 
+						filteredProjects.sort(
+							(a, b) => getProjectDuration(b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getProjectDuration(a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as project}
+						{#if getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0}
+							<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)"
+								>
+								<div class="flex items-center rounded-lg p-2"
+								style="background-color: {project.color}">	
+									<span class="text-xl">{project.icon}</span>
+								</div>
+								<p class="text-md font-bold">
+									{project.name}:
+								</p>
+								<p class="text-md">
+									{formatNaturalDuration(getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end))}
+								</p>
+							</div>
+						{/if}
+					{/each}
+				{/if}
+				{#if showByCategory}
+					{#each filteredCategories.sort((a, b) => getCategoryDuration(filteredProjects, b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getCategoryDuration(filteredProjects, a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as category}
+						<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)">
 							<div class="flex items-center rounded-lg p-2"
-							style="background-color: {project.color}">	
-								<span class="text-xl">{project.icon}</span>
+							style="background-color: {category.color}">	
+								<span class="text-xl w-2.5 h-2.5"></span>
 							</div>
 							<p class="text-md font-bold">
-								{project.name}:
+								{category.name}:
 							</p>
 							<p class="text-md">
-								{formatNaturalDuration(getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end))}
+								{formatNaturalDuration(getCategoryDuration(filteredProjects, category.id, plugin.timesheetData.records, dateRange.start, dateRange.end))}
 							</p>
 						</div>
-					{/if}
-				{/each}
+					{/each}
+				{/if}
 			</div>
 
 		</div>

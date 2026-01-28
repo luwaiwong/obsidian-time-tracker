@@ -75,30 +75,30 @@
 			oninput={timeChanged}
 		/>
 		<div class="flex flex-row gap-1 w-full">
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(-30)}
+			<button class="flex-1  rounded" onclick={() => adjust(-30)}
 				>-30</button
 			>
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(-5)}
+			<button class="flex-1  rounded" onclick={() => adjust(-5)}
 				>-5</button
 			>
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(-1)}
+			<button class="flex-1  rounded" onclick={() => adjust(-1)}
 				>-1</button
 			>
 			{#if customButton}
 				<button
-					class="flex-1 py-1 rounded"
+					class="flex-1  rounded"
 					onclick={customButton.onClick}
 				>
 					{customButton.label}
 				</button>
 			{/if}
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(1)}
+			<button class="flex-1  rounded" onclick={() => adjust(1)}
 				>+1</button
 			>
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(5)}
+			<button class="flex-1  rounded" onclick={() => adjust(5)}
 				>+5</button
 			>
-			<button class="flex-1 py-1 rounded" onclick={() => adjust(30)}
+			<button class="flex-1  rounded" onclick={() => adjust(30)}
 				>+30</button
 			>
 		</div>

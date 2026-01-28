@@ -156,7 +156,7 @@ export class EditRecordModal extends Modal {
 						variant: "default",
 					},
 					{
-						text: "Create New Record",
+						text: "New Record",
 						onClick: () => this.createNew(),
 						variant: "default",
 					},

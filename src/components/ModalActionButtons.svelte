@@ -3,6 +3,7 @@
 		text: string;
 		onClick: () => void;
 		variant?: 'cta' | 'warning' | 'default';
+		useAwaitClickCallback?: boolean;
 	}
 
 	interface Props {
@@ -21,10 +22,28 @@
 		return '';
 	}
 
-	function handleClick(e: Event, callback: () => void) {
+	let buttonStates = $state<Record<string, boolean>>({
+		saving: false,
+	});
+
+	async function handleClick(e: Event, btn: ButtonConfig) {
 		e.preventDefault();
 		e.stopPropagation();
-		callback();
+		
+		// direct call if not using await callback
+		if (btn.useAwaitClickCallback ) {
+			btn.onClick();
+			return;
+		}
+
+		// await callback and use saving state
+		if (buttonStates.saving) return;
+		buttonStates[btn.text] = true;
+		try {
+			await btn.onClick();
+		} finally {
+			buttonStates[btn.text] = false;
+		}
 	}
 </script>
 
@@ -37,9 +56,14 @@
 				<button
 					type="button"
 					class={getButtonClass(btn.variant)}
-					onclick={(e) => handleClick(e, btn.onClick)}
+					disabled={!btn.useAwaitClickCallback && buttonStates[btn.text]}
+					onclick={(e) => handleClick(e, btn)}
 				>
-					{btn.text}
+					{#if !btn.useAwaitClickCallback && buttonStates[btn.text]}
+						<span class="loading-spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+					{:else}
+						{btn.text}
+					{/if}
 				</button>
 			{/each}
 		</div>
@@ -50,25 +74,23 @@
 			<button
 				type="button"
 				class={getButtonClass(btn.variant)}
-				onclick={(e) => handleClick(e, btn.onClick)}
+				disabled={!btn.useAwaitClickCallback && buttonStates[btn.text]}
+				onclick={(e) => handleClick(e, btn)}
 			>
-				{btn.text}
+				{#if !btn.useAwaitClickCallback && buttonStates[btn.text]}
+					<span class="loading-spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+				{:else}
+					{btn.text}
+				{/if}
 			</button>
 		{/each}
-		<!-- {#if cancelButton}
-			<button
-				type="button"
-				onclick={(e) => handleClick(e, cancelButton!.onClick)}
-			>
-				{cancelButton?.text ?? 'Cancel'}
-			</button>
-		{/if}
-		<button
-			type="button"
-			class={getButtonClass(primaryButton.variant)}
-			onclick={(e) => handleClick(e, primaryButton.onClick)}
-		>
-			{primaryButton.text}
-		</button> -->
 	</div>
 </div>
+
+<style>
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+</style>

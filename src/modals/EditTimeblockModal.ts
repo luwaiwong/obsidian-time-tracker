@@ -56,9 +56,8 @@ export class EditTimeblockModal extends Modal {
 		modalEl.addClass("edit-timeblock-modal");
 
 		this.scope.register([], "Enter", (e) => {
-			// e.preventDefault();
-			// this.save();
-			// return false;
+			e.preventDefault();
+			void this.save();
 		});
 
 		// title section

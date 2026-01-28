@@ -1,4 +1,5 @@
-import type { TimeRecord } from "../types";
+import TimeTrackerPlugin from "main";
+import type { Project, TimeRecord } from "../types";
 
 /**
  * format duration in format hh:mm:ss
@@ -92,6 +93,35 @@ export function getProjectDuration(
 		}, 0);
 }
 
+export function getCategoryDuration(
+	projects: Project[],
+	categoryId: number,
+	records: TimeRecord[],
+	startTime?: number,
+	endTime?: number,
+): number {
+	// get category projects
+	const categoryProjects = projects.filter((p) => p.categoryId === categoryId);
+
+	return records
+		.filter((r) => categoryProjects.some((p) => p.id === r.projectId) && r.endTime !== null)
+		.filter((r) => {
+			const recordEnd = r.endTime!.getTime();
+			const recordStart = r.startTime.getTime();
+			if (startTime && recordEnd < startTime) return false;
+			if (endTime && recordStart > endTime) return false;
+			return true;
+		})
+		.reduce((total, record) => {
+			const recordStart = record.startTime.getTime();
+			const recordEnd = record.endTime!.getTime();
+			const start = startTime
+				? Math.max(recordStart, startTime)
+				: recordStart;
+			const end = endTime ? Math.min(recordEnd, endTime) : recordEnd;
+			return total + (end - start);
+		}, 0);
+}
 /**
  * get time range boundaries
  */

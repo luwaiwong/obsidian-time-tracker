@@ -102,7 +102,7 @@ export class CreateRecordModal extends Modal {
 		});
 
 		const line = contentEl.createEl("div");
-		line.setCssProps({ margin: "0 0 8px 8px" });
+		line.setCssProps({ margin: "0 0 16px 8px" });
 
 		// recent records section
 		// const recentContainer = contentEl.createDiv();
