@@ -29,15 +29,16 @@
 	let selectedDate = $state(new Date());
 	let now = $state(Date.now());
 	let interval: number | undefined;
-	let projects = $derived(plugin.timesheetData?.projects ?? []);
-	let records = $derived(plugin.timesheetData?.records ?? []);
-	let timeblocks = $derived(plugin.timeblocksData?.timeblocks ?? []);
-
 	let icsEvents = $state<IcsCalendarEvent[]>(plugin.icsCache.events);
 	let icsLoading = $state(false);
 	let zoomLevel = $state(plugin.settings.scheduleZoom);
 	let isUpdatingCalendar = false;
 	let pendingCalendarUpdate = false;
+	let dataVersion = $state(0);
+
+	function notifyDataChanged() {
+		dataVersion++;
+	}
 
 	const ZOOM_LEVELS = [15, 30, 60, 120];
 
@@ -105,7 +106,7 @@
 		const { start, end } = getDayRange(selectedDate);
 
 		// Process completed records
-		for (const record of records) {
+		for (const record of (plugin.timesheetData?.records ?? [])) {
 			if (record.endTime === null) continue;
 			const recordStart = record.startTime.getTime();
 			const recordEnd = record.endTime.getTime();
@@ -162,7 +163,7 @@
 
 		// process timeblocks (only if enabled)
 		if (!plugin.settings.enableTimeblocking) return events;
-		for (const timeblock of timeblocks) {
+		for (const timeblock of (plugin.timeblocksData?.timeblocks ?? [])) {
 			const tbStart = timeblock.startTime.getTime();
 			const tbEnd = timeblock.endTime.getTime();
 			if (tbEnd < start || tbStart > end) continue;
@@ -199,27 +200,7 @@
 		};
 	}
 
-	function addTimeblockToCalendar(timeblock: Timeblock) {
-		if (!calendar || !plugin.settings.enableTimeblocking) return;
-		calendar.addEvent(buildTimeblockEvent(timeblock));
-	}
 
-	function updateTimeblockOnCalendar(timeblock: Timeblock) {
-		if (!calendar || !plugin.settings.enableTimeblocking) return;
-		const event = calendar.getEventById(`timeblock-${timeblock.id}`);
-		if (event) {
-			event.remove();
-		}
-		addTimeblockToCalendar(timeblock);
-	}
-
-	function removeTimeblockFromCalendar(id: number) {
-		if (!calendar) return;
-		const event = calendar.getEventById(`timeblock-${id}`);
-		if (event) {
-			event.remove();
-		}
-	}
 
 
 	async function fetchIcsEvents(force = false) {
@@ -271,8 +252,25 @@
 			for (const newEvent of allEvents) {
 				const existing = currentEventsMap.get(newEvent.id);
 				if (existing) {
-					if ('isRunning' in newEvent.extendedProps && newEvent.extendedProps.isRunning) {
-						existing.setEnd(newEvent.end);
+					const newStart = newEvent.start instanceof Date ? newEvent.start.getTime() : new Date(newEvent.start as string).getTime();
+					const newEnd = newEvent.end instanceof Date ? newEvent.end.getTime() : new Date(newEvent.end as string).getTime();
+
+					if (existing.start?.getTime() !== newStart || existing.end?.getTime() !== newEnd) {
+						existing.setDates(newEvent.start, newEvent.end);
+					}
+					if (existing.title !== newEvent.title) {
+						existing.setProp('title', newEvent.title);
+					}
+					if (existing.backgroundColor !== newEvent.backgroundColor) {
+						existing.setProp('backgroundColor', newEvent.backgroundColor);
+					}
+					if (existing.borderColor !== newEvent.borderColor) {
+						existing.setProp('borderColor', newEvent.borderColor);
+					}
+					if ('isTimeblock' in newEvent.extendedProps) {
+						existing.setExtendedProp('timeblock', newEvent.extendedProps.timeblock);
+						existing.setExtendedProp('color', newEvent.extendedProps.color);
+						existing.setExtendedProp('duration', newEvent.extendedProps.duration);
 					}
 				} else {
 					eventsToAdd.push(newEvent);
@@ -351,7 +349,22 @@
 			},
 			eventMinHeight: 0,
 			eventShortHeight: 100000,
+			selectable: plugin.settings.enableTimeblocking,
+			selectMirror: true,
+			selectMinDistance: 5,
 			events: [...buildCalendarEvents(), ...icsEvents],
+			select: async (info) => {
+				if (!plugin.settings.enableTimeblocking) return;
+				await plugin.createTimeblock({
+					title: "",
+					startTime: info.start,
+					endTime: info.end,
+					color: getComputedStyle(document.body).getPropertyValue('--interactive-accent').trim(),
+					notes: "",
+				});
+				calendar?.unselect();
+				notifyDataChanged();
+			},
 			dateClick(arg) {
 				if (!plugin.settings.enableTimeblocking) return;
 				const startDate = arg.date;
@@ -361,7 +374,7 @@
 					plugin,
 					startDate,
 					endDate,
-					(timeblock) => addTimeblockToCalendar(timeblock),
+					() => notifyDataChanged(),
 				).open();
 			},
 			eventClick: (info) => {
@@ -385,8 +398,8 @@
 						plugin.app,
 						plugin,
 						currentTimeblock,
-						(updated: Timeblock) => updateTimeblockOnCalendar(updated),
-						(id: number) => removeTimeblockFromCalendar(id),
+						() => notifyDataChanged(),
+						() => notifyDataChanged(),
 					).open();
 				} else if (props?.project && props?.record) {
 					onEditRecord(props.record, props.project);
@@ -410,6 +423,7 @@
 						startTime: startTime,
 						endTime: info.event.end!,
 					});
+					notifyDataChanged();
 				} else {
 					info.revert();
 				}
@@ -425,6 +439,7 @@
 						startTime: info.event.start!,
 						endTime: info.event.end!,
 					});
+					notifyDataChanged();
 				} else {
 					info.revert();
 				}
@@ -588,14 +603,10 @@
 
 	// Update events when data changes
 	$effect(() => {
-		// track dependencies
-		projects;
-		records;
-		timeblocks;
 		selectedDate;
 		icsEvents;
 		now;
-		plugin.settings.enableTimeblocking;
+		dataVersion;
 		updateCalendarEvents();
 	});
 </script>
