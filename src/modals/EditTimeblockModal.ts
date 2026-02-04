@@ -220,11 +220,6 @@ export class EditTimeblockModal extends Modal {
 	}
 
 	async save() {
-		if (!this.titleInput.trim()) {
-			new Notice("Please enter a title");
-			return;
-		}
-
 		if (this.endTime.getTime() <= this.startTime.getTime()) {
 			new Notice("End time must be after start time");
 			return;

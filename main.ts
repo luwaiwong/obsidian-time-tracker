@@ -114,7 +114,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			name: "View backups",
 			callback: () => new BackupViewerModal(this.app, this).open(),
 		});
-
 		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
 
 		this.app.workspace.onLayoutReady(async () => {
@@ -178,6 +177,7 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	async loadTimesheet() {
+		console.log("Loading timesheet");
 		const hasExistingData =
 			this.timesheetData.records.length > 0 ||
 			this.timesheetData.projects.length > 0;
@@ -209,6 +209,18 @@ export default class TimeTrackerPlugin extends Plugin {
 			if (this.isTimesheetDataEqual(this.timesheetData, newData)) {
 				this.isLoading = false;
 				return;
+			}
+
+			// register commands for each new non-archived project
+			for (const project of newData.projects) {
+				if (project.archived) continue;
+				if (this.timesheetData.projects.find((p) => p.id === project.id)) continue;
+				const title = this.settings.retroactiveTrackingEnabled ? "Retroactively track" : "Start time tracker for";
+				this.addCommand({
+					id: `track-${project.id}`,
+					name: `${title} ${project.name}`,
+					callback: () => this.startTimer(project.id),
+				});
 			}
 
 			this.timesheetData = newData;
@@ -283,7 +295,6 @@ export default class TimeTrackerPlugin extends Plugin {
 			}
 
 			this.timeblocksData = newData;
-			this.refreshViews();
 		} catch (err) {
 			new Notice("Error loading Timeblocks: " + err);
 		}
@@ -303,12 +314,19 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	async createTimeblock(timeblock: Omit<Timeblock, "id">): Promise<Timeblock> {
+		const startTime = new Date(timeblock.startTime);
+		startTime.setMilliseconds(0);
+		const endTime = new Date(timeblock.endTime);
+		endTime.setMilliseconds(0);
+
 		const newTimeblock: Timeblock = {
 			id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
 			...timeblock,
+			startTime,
+			endTime,
 			notes: (timeblock.notes ?? "").toString(),
 		};
-		this.timeblocksData.timeblocks.push(newTimeblock);
+		this.timeblocksData.timeblocks = [...this.timeblocksData.timeblocks, newTimeblock];
 		await this.saveTimeblocks();
 		return newTimeblock;
 	}
@@ -317,10 +335,18 @@ export default class TimeTrackerPlugin extends Plugin {
 		const index = this.timeblocksData.timeblocks.findIndex((t) => t.id === id);
 		if (index === -1) return;
 
-		this.timeblocksData.timeblocks[index] = {
-			...this.timeblocksData.timeblocks[index],
-			...changes,
-		};
+		if (changes.startTime) {
+			changes.startTime = new Date(changes.startTime);
+			changes.startTime.setMilliseconds(0);
+		}
+		if (changes.endTime) {
+			changes.endTime = new Date(changes.endTime);
+			changes.endTime.setMilliseconds(0);
+		}
+
+		this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.map((t, i) =>
+			i === index ? { ...t, ...changes } : t,
+		);
 		await this.saveTimeblocks();
 	}
 
