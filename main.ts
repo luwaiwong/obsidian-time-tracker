@@ -177,7 +177,6 @@ export default class TimeTrackerPlugin extends Plugin {
 	}
 
 	async loadTimesheet() {
-		console.log("Loading timesheet");
 		const hasExistingData =
 			this.timesheetData.records.length > 0 ||
 			this.timesheetData.projects.length > 0;
