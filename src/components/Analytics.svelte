@@ -590,7 +590,7 @@
 	<div class="grid gap-4 w-full" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));">
 		<div class="bg-(--background-secondary) p-4 pt-0 rounded-lg overflow-hidden">
 			<div class="flex justify-between items-center mb-2">
-				<h4 class="m-0 font-medium">Distribution</h4>
+				<h2 class="m-0 font-medium">Distribution</h2>
 				<label class="flex items-center gap-2 cursor-pointer text-sm">
 					<input type="checkbox" bind:checked={showByCategory} />
 					By category
@@ -600,13 +600,13 @@
 				<canvas bind:this={pieChartCanvas}></canvas>
 			</div>
 			<!-- list of projects sorted by duration -->
-			<div class="flex justify-start flex-col items-start gap-2 pt-4">
+			<div class="flex justify-start flex-col items-start gap-2 pt-2">
 				{#if !showByCategory}
 					{#each 
 						filteredProjects.sort(
 							(a, b) => getProjectDuration(b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getProjectDuration(a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as project}
 						{#if getProjectDuration(project.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0}
-							<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)"
+							<div class="flex items-center w-full p-2 rounded-lg gap-2"
 								>
 								<div class="flex items-center rounded-lg p-2"
 								style="background-color: {project.color}">	
@@ -623,11 +623,13 @@
 					{/each}
 				{/if}
 				{#if showByCategory}
-					{#each filteredCategories.sort((a, b) => getCategoryDuration(filteredProjects, b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getCategoryDuration(filteredProjects, a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as category}
-						<div class="flex items-center w-full p-2 rounded-lg gap-2 bg-(--background-secondary-alt)">
+					{#each filteredCategories
+					.filter((c) => getCategoryDuration(filteredProjects, c.id, plugin.timesheetData.records, dateRange.start, dateRange.end) > 0)
+					.sort((a, b) => getCategoryDuration(filteredProjects, b.id, plugin.timesheetData.records, dateRange.start, dateRange.end) - getCategoryDuration(filteredProjects, a.id, plugin.timesheetData.records, dateRange.start, dateRange.end)) as category}
+						<div class="flex items-center w-full p-2 rounded-lg gap-2">
 							<div class="flex items-center rounded-lg p-2"
 							style="background-color: {category.color}">	
-								<span class="text-xl w-2.5 h-2.5"></span>
+								<span class="text-xl w-5 h-5"></span>
 							</div>
 							<p class="text-md font-bold">
 								{category.name}:
@@ -643,7 +645,7 @@
 		</div>
 
 		<div class="bg-(--background-secondary) p-4 pt-0 rounded-lg overflow-hidden">
-			<h4 class="m-0 mb-2 font-medium">Timeline</h4>
+			<h2 class="m-0 mb-2 font-medium">Timeline</h2>
 			<div class="min-h-[250px] w-full">
 				<canvas bind:this={lineChartCanvas}></canvas>
 			</div>
