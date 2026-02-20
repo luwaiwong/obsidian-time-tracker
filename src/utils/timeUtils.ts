@@ -1,4 +1,3 @@
-import TimeTrackerPlugin from "main";
 import type { Project, TimeRecord } from "../types";
 
 /**

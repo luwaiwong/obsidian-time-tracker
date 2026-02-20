@@ -281,4 +281,20 @@ export class CSVHandler {
     if (items.length === 0) return 1;
     return Math.max(...items.map((i) => i.id)) + 1;
   }
+
+  /**
+   * Convert Android 32-bit color (AARRGGBB integer) to CSS hex string (#RRGGBB).
+   */
+  static androidColorToHex(color: number): string {
+    const u = color >>> 0;
+    const r = (u >> 16) & 0xff;
+    const g = (u >> 8) & 0xff;
+    const b = u & 0xff;
+    return (
+      "#" +
+      [r, g, b]
+        .map((x) => x.toString(16).padStart(2, "0"))
+        .join("")
+    );
+  }
 }
