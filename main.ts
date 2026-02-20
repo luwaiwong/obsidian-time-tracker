@@ -1,21 +1,21 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, requestUrl } from "obsidian";
 import { TimeTrackerSettingTab } from "./src/settings";
 import {
-	TimeTrackerView,
-	VIEW_TYPE_TIME_TRACKER,
+    TimeTrackerView,
+    VIEW_TYPE_TIME_TRACKER,
 } from "./src/views/TimeTrackerView";
 import { AnalyticsView, VIEW_TYPE_ANALYTICS } from "./src/views/AnalyticsView";
 import { CSVHandler } from "./src/handlers/csvHandler";
 import { BackupHandler } from "./src/handlers/backupHandler";
 import { TimeblocksHandler } from "./src/handlers/timeblocksHandler";
 import type {
-	PluginSettings,
-	TimesheetData,
-	TimeblocksData,
-	TimeRecord,
-	Project,
-	Timeblock,
-	IcsCalendarEvent,
+    PluginSettings,
+    TimesheetData,
+    TimeblocksData,
+    TimeRecord,
+    Project,
+    Timeblock,
+    IcsCalendarEvent,
 } from "./src/types";
 import { ImportModal } from "./src/modals/ImportSTTModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
@@ -23,714 +23,767 @@ import { CategoryHandler } from "./src/handlers/categoryHandler";
 import { CreateRecordModal } from "./src/modals/CreateRecordModal";
 
 const DEFAULT_SETTINGS: PluginSettings = {
-	timesheetPath: "timesheet.csv",
-	timeblocksPath: "timeblocks.csv",
-	settingsPath: "time-tracker-settings.json",
+    timesheetPath: "timesheet.csv",
+    timeblocksPath: "timeblocks.csv",
+    settingsPath: "time-tracker-settings.json",
 
-	retroactiveTrackingEnabled: false,
-	enableTimeblocking: true,
-	showSeconds: true,
-	showArchivedProjects: false,
-	gridColumns: 5,
-	defaultTimeRange: "day",
-	customStartDate: Date.now(),
-	customEndDate: Date.now(),
-	sortMode: "color",
-	categoryFilter: [],
-	icsCalendars: [],
-	scheduleZoom: 60,
+    retroactiveTrackingEnabled: false,
+    enableTimeblocking: true,
+    showSeconds: true,
+    showArchivedProjects: false,
+    gridColumns: 5,
+    defaultTimeRange: "day",
+    customStartDate: Date.now(),
+    customEndDate: Date.now(),
+    sortMode: "color",
+    categoryFilter: [],
+    icsCalendars: [],
+    scheduleZoom: 60,
 };
 
 export default class TimeTrackerPlugin extends Plugin {
-	settings: PluginSettings;
-	timesheetData: TimesheetData = {
-		records: [],
-		projects: [],
-		categories: [],
-	};
-	timeblocksData: TimeblocksData = {
-		timeblocks: [],
-	};
-	csvHandler: CSVHandler;
-	backupHandler: BackupHandler;
-	timeblocksHandler: TimeblocksHandler;
-	categoryHandler: CategoryHandler;
-	private timesheetFile: TFile | null = null;
-	private timeblocksFile: TFile | null = null;
-	error: string | null = null;
-	isLoading: boolean = true;
-
-	// cache ics events, dont fetch every time schedule refreshed
-	icsCache: { events: IcsCalendarEvent[]; fetched: boolean; loading: boolean } = {
-		events: [],
-		fetched: false,
-		loading: false,
-	};
-	// schedule view state (fix scroll position)
-	scheduleState: { scrollTop: number } = { scrollTop: 0 };
-
-	// ----- OBSIDIAN FUNCTIONS -----
-	async onload() {
-		await this.loadSettings();
-		this.csvHandler = new CSVHandler(this.app.vault);
-		this.backupHandler = new BackupHandler(this.app);
-		this.timeblocksHandler = new TimeblocksHandler(this.app.vault);
-		this.categoryHandler = new CategoryHandler(this);
-		
-		this.registerView(
-			VIEW_TYPE_TIME_TRACKER,
-			(leaf) => new TimeTrackerView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_ANALYTICS,
-			(leaf) => new AnalyticsView(leaf, this),
-		);
-		this.addRibbonIcon("clock", "Time tracker", async() => {
-			await this.activateView();
-		});
-
-		this.addCommand({
-			id: "open-time-tracking-view",
-			name: "Open time tracking view",
-			callback: async() => await this.activateView(),
-		});
-		this.addCommand({
-			id: "open-analytics-view",
-			name: "Open analytics view",
-			callback: () => this.activateAnalyticsView(),
-		});
-		this.addCommand({
-			id: "track-time",
-			name: "Track time",
-			callback: () => new CreateRecordModal(this.app, this, () => {}, false).open(),
-		});
-		this.addCommand({
-			id: "import-data",
-			name: "Import data from other apps",
-			callback: () => new ImportModal(this.app, this).open(),
-		});
-		this.addCommand({
-			id: "view-backups",	
-			name: "View backups",
-			callback: () => new BackupViewerModal(this.app, this).open(),
-		});
-		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
-
-		this.app.workspace.onLayoutReady(async () => {
-			await this.loadPluginData();
-			await this.backupHandler.createBackup(this.settings.timesheetPath);
-			await this.activateView();
-		});
-
-		// backup every 3 hours
-		this.registerInterval(
-			window.setInterval(
-				() => void this.backupHandler.createBackup(this.settings.timesheetPath),
-				3 * 60 * 60 * 1000,
-			),
-		);
-
-		// reload timesheet when app comes back to foreground for mobile
-		this.registerDomEvent(document, "visibilitychange", () => {
-			if (document.visibilityState === "visible") {
-				void this.loadPluginData();
-			}
-		});
-
-		// reload timesheet every 30 seconds
-		this.registerInterval(
-			window.setInterval(() => {
-				void this.loadPluginData();
-			}, 0.5 * 60 * 1000),
-		);
-	}
-
-	async loadPluginData(){
-		try {
-			await this.loadTimesheet();
-			await this.loadTimeblocks();
-		} catch (err) {
-			new Notice("Error loading plugin data: " + err);
-		}
-	}
-
-	async savePluginData(){
-		await this.saveTimesheet();
-		await this.saveTimeblocks();
-	}
-
-	onunload() {
-		void this.savePluginData();
-	}
-
-	// ----- LOADING DATA -----
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData() || {},
-		) as PluginSettings;
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-
-	async loadTimesheet() {
-		const hasExistingData =
-			this.timesheetData.records.length > 0 ||
-			this.timesheetData.projects.length > 0;
-
-		// only show loading if no data exists yet
-		if (!hasExistingData) {
-			this.isLoading = true;
-		}
-
-		try {
-			const file = this.app.vault.getAbstractFileByPath(
-				this.settings.timesheetPath,
-			);
-
-			let newData: TimesheetData;
-			if (file instanceof TFile) {
-				this.timesheetFile = file;
-				newData = await this.csvHandler.parseTimesheet(file);
-			} else {
-				this.timesheetFile = await this.csvHandler.createTimesheet(
-					this.settings.timesheetPath,
-				);
-				newData = await this.csvHandler.parseTimesheet(
-					this.timesheetFile,
-				);
-			}
-
-			// compare new data with current data, skip refresh if unchanged
-			if (this.isTimesheetDataEqual(this.timesheetData, newData)) {
-				this.isLoading = false;
-				return;
-			}
-
-			// register commands for each new non-archived project
-			for (const project of newData.projects) {
-				if (project.archived) continue;
-				if (this.timesheetData.projects.find((p) => p.id === project.id)) continue;
-				const title = this.settings.retroactiveTrackingEnabled ? "Retroactively track" : "Start time tracker for";
-				this.addCommand({
-					id: `track-${project.id}`,
-					name: `${title} ${project.name}`,
-					callback: () => this.startTimer(project.id),
-				});
-			}
-
-			this.timesheetData = newData;
-			this.isLoading = false;
-			this.refreshViews();
-		} catch (err) {
-			this.error = "Error loading Timesheet: " + err;
-			this.isLoading = false;
-			this.refreshViews();
-		}
-	}
-
-	private isTimesheetDataEqual(a: TimesheetData, b: TimesheetData): boolean {
-		if (
-			a.records.length !== b.records.length ||
-			a.projects.length !== b.projects.length ||
-			a.categories.length !== b.categories.length
-		) {
-			return false;
-		}
-
-		// compare records by stringifying (handles Date objects)
-		const aRecords = JSON.stringify(a.records);
-		const bRecords = JSON.stringify(b.records);
-		if (aRecords !== bRecords) return false;
-
-		const aProjects = JSON.stringify(a.projects);
-		const bProjects = JSON.stringify(b.projects);
-		if (aProjects !== bProjects) return false;
-
-		const aCategories = JSON.stringify(a.categories);
-		const bCategories = JSON.stringify(b.categories);
-		if (aCategories !== bCategories) return false;
-
-		return true;
-	}
-
-	async saveTimesheet() {
-		if (!this.timesheetFile) return;
-
-		try {
-			await this.csvHandler.writeTimesheet(
-				this.timesheetFile,
-				this.timesheetData,
-			);
-		} catch (err) {
-			this.error = "Error saving Timesheet: " + err;
-		}
-	}
-
-	// ----- TIMEBLOCKS -----
-	async loadTimeblocks() {
-		try {
-			const file = this.app.vault.getAbstractFileByPath(
-				this.settings.timeblocksPath,
-			);
-
-			let newData: TimeblocksData;
-			if (file instanceof TFile) {
-				this.timeblocksFile = file;
-				newData = await this.timeblocksHandler.parseTimeblocks(file);
-			} else {
-				this.timeblocksFile = await this.timeblocksHandler.createTimeblocks(
-					this.settings.timeblocksPath,
-				);
-				newData = { timeblocks: [] };
-			}
-
-			// skip refresh if unchanged
-			if (JSON.stringify(this.timeblocksData) === JSON.stringify(newData)) {
-				return;
-			}
-
-			this.timeblocksData = newData;
-		} catch (err) {
-			new Notice("Error loading Timeblocks: " + err);
-		}
-	}
-
-	async saveTimeblocks() {
-		if (!this.timeblocksFile) return;
-
-		try {
-			await this.timeblocksHandler.writeTimeblocks(
-				this.timeblocksFile,
-				this.timeblocksData,
-			);
-		} catch (err) {
-			new Notice("Error saving Timeblocks: " + err);
-		}
-	}
-
-	async createTimeblock(timeblock: Omit<Timeblock, "id">): Promise<Timeblock> {
-		const startTime = new Date(timeblock.startTime);
-		startTime.setMilliseconds(0);
-		const endTime = new Date(timeblock.endTime);
-		endTime.setMilliseconds(0);
-
-		const newTimeblock: Timeblock = {
-			id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
-			...timeblock,
-			startTime,
-			endTime,
-			notes: (timeblock.notes ?? "").toString(),
-		};
-		this.timeblocksData.timeblocks = [...this.timeblocksData.timeblocks, newTimeblock];
-		await this.saveTimeblocks();
-		return newTimeblock;
-	}
-
-	async updateTimeblock(id: number, changes: Partial<Timeblock>): Promise<void> {
-		const index = this.timeblocksData.timeblocks.findIndex((t) => t.id === id);
-		if (index === -1) return;
-
-		if (changes.startTime) {
-			changes.startTime = new Date(changes.startTime);
-			changes.startTime.setMilliseconds(0);
-		}
-		if (changes.endTime) {
-			changes.endTime = new Date(changes.endTime);
-			changes.endTime.setMilliseconds(0);
-		}
-
-		this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.map((t, i) =>
-			i === index ? { ...t, ...changes } : t,
-		);
-		await this.saveTimeblocks();
-	}
-
-	async deleteTimeblock(id: number): Promise<void> {
-		this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.filter(
-			(t) => t.id !== id,
-		);
-		await this.saveTimeblocks();
-	}
-
-	getTimeblockById(id: number): Timeblock | undefined {
-		return this.timeblocksData.timeblocks.find((t) => t.id === id);
-	}
-
-	get runningTimers(): TimeRecord[] {
-		if (!this.timesheetData || !this.timesheetData.records) {
-			return [];
-		}
-		return this.timesheetData.records.filter(
-			(record) => record.endTime === null,
-		);
-	}
-
-	// ----- RECORDS -----
-
-	/*
-	 * start tracking time without a project
-	 * can only be used when retroactive mode is off
-	 * @param title - The title of the task being tracked
-	 */
-	async startTimerWithoutProject(title: string = "") {
-		if (this.settings.retroactiveTrackingEnabled) {
-			throw new Error(
-				"Cannot start timer without project in retroactive mode",
-			);
-		}
-
-		const now = new Date();
-
-		await this.stopAllTimers();
-
-		// Create a new record with null endTime (running timer) and empty projectName
-		const newRecord: TimeRecord = {
-			id: CSVHandler.getNextId(this.timesheetData.records),
-			projectId: -1,
-			startTime: now,
-			endTime: null,
-			title: title,
-		};
-		this.timesheetData.records.push(newRecord);
-
-		await this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** start tracking time for a project */
-	async startTimer(
-		projectId: number = -1,
-		title: string = "",
-		startTime?: Date,
-		endTime?: Date,
-	) {
-		let project = this.getProjectById(projectId);
-		if (projectId === -1) {
-			project = undefined;
-		}
-
-		const now = new Date();
-
-		// for retroactive
-		if (this.settings.retroactiveTrackingEnabled) {
-			const lastRecord = this.getLastStoppedRecord();
-			if (lastRecord && lastRecord.endTime) {
-				const gap = now.getTime() - lastRecord.endTime.getTime();
-				if (gap > 0) {
-					// extend record if the project is the same and start time is the same as last project end time(within 10 minutes)
-					const startTimeSame = startTime ? Math.abs(lastRecord.endTime.getTime() - startTime.getTime()) < 10 * 60 * 1000 : true;
-					if (project && lastRecord.projectId === project.id && startTimeSame) {
-						const index = this.timesheetData.records.findIndex(
-							(r) => r.id === lastRecord.id,
-						);
-						if (index !== -1) {
-							this.timesheetData.records[index].endTime = endTime ?? now;
-						}
-					} 
-					// otherwise we create a new record
-					else {
-						const newRecord: TimeRecord = {
-							id: CSVHandler.getNextId(
-								this.timesheetData.records,
-							),
-							projectId: project ? project.id : -1,
-							startTime: startTime ?? lastRecord.endTime,
-							endTime: endTime ?? now,
-							title: title,
-						};
-						this.timesheetData.records.push(newRecord);
-					}
-				}
-			}
-		} else {
-			await this.stopAllTimers();
-
-			// check if this project is already running
-			const existingTimer = this.runningTimers.find(
-				(t) => t.projectId === projectId,
-			);
-
-			if (existingTimer) {
-				await this.stopTimer(existingTimer.id);
-			} else {
-				// create a new record with null endTime (running timer)
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectId: project ? project.id : -1,
-					startTime: startTime ?? now,
-					endTime: null,
-					title: title,
-				};
-				this.timesheetData.records.push(newRecord);
-			}
-		}
-
-		await this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/** find record by ID and extend its time */
-	async repeatRecord(recordId: number, endTime: Date) {
-		const record = this.timesheetData.records.find((r) => r.id === recordId);
-		if (!record) return;
-
-		if (this.settings.retroactiveTrackingEnabled) {
-			const lastRecord = this.getLastStoppedRecord();
-			if (
-				lastRecord && lastRecord.projectId === record.projectId && lastRecord.title === record.title
-			) {
-				const index = this.timesheetData.records.findIndex(
-					(r) => r.id === lastRecord.id,
-				);
-				if (index !== -1) {
-					this.timesheetData.records[index].endTime = new Date();
-					await this.saveTimesheet();
-					this.refreshViews();
-				}
-			} else {
-				const now = new Date();
-				const startTime = lastRecord?.endTime || now;
-				const newRecord: TimeRecord = {
-					id: CSVHandler.getNextId(this.timesheetData.records),
-					projectId: record.projectId,
-					startTime: startTime,
-					endTime: now,
-					title: record.title,
-				};
-				this.timesheetData.records.push(newRecord);
-				await this.saveTimesheet();
-				this.refreshViews();
-			}
-		} else {
-			if (record.projectId) {
-				await this.startTimer(record.projectId);
-				setTimeout(() => {
-					void (async () => {
-						const runningRecord = this.timesheetData.records.find(
-							(r) => r.projectId === record.projectId && r.endTime === null,
-						);
-						if (runningRecord) {
-							runningRecord.title = record.title;
-							await this.saveTimesheet();
-						}
-					})();
-				}, 100);
-			} else {
-				await this.startTimerWithoutProject(record.title);
-			}
-		}
-	}
-
-	/** stop a specific timer by record ID */
-	async stopTimer(recordId: number) {
-		const recordIndex = this.timesheetData.records.findIndex(
-			(r) => r.id === recordId && r.endTime === null,
-		);
-
-		if (recordIndex === -1) return;
-
-		this.timesheetData.records[recordIndex].endTime = new Date();
-
-		await this.saveTimesheet();
-		this.refreshViews();
-	}
-
-	/*
-	 * edit a specific record
-	 * returns true if the record was successfully edited
-	 */
-	async editRecord(id: number, changes: TimeRecord): Promise<boolean> {
-		const recordIndex = this.timesheetData.records.findIndex(
-			(r) => r.id === id,
-		);
-		if (recordIndex === -1) return false;
-
-		this.timesheetData.records[recordIndex] = {
-			...this.timesheetData.records[recordIndex],
-			...changes,
-		};
-
-		await this.saveTimesheet();
-		// this.refreshViews();
-		return true;
-	}
-
-	/** stop all running timers */
-	async stopAllTimers() {
-		const now = new Date();
-		for (const record of this.timesheetData.records) {
-			if (record.endTime === null) {
-				record.endTime = now;
-			}
-		}
-
-		await this.saveTimesheet();
-		// this.refreshViews();
-	}
-
-	/** set the last stopped record (completed, with endTime) */
-	getLastStoppedRecord(): TimeRecord | null {
-		const completedRecords = this.timesheetData.records.filter(
-			(r) => r.endTime !== null,
-		);
-		if (completedRecords.length === 0) return null;
-
-		return completedRecords.reduce((latest, record) => {
-			if (!latest.endTime) return record;
-			if (!record.endTime) return latest;
-			return record.endTime.getTime() > latest.endTime.getTime()
-				? record
-				: latest;
-		});
-	}
-
-	/** toggle the last used timer */
-	async toggleLastTimer() {
-		const lastRecord = this.getLastStoppedRecord();
-		if (!lastRecord) return;
-
-		const project = this.getProjectById(lastRecord.projectId);
-		if (!project) return;
-
-		const isRunning = this.runningTimers.some(
-			(t) => t.projectId === project.id,
-		);
-		if (isRunning) {
-			const runningRecord = this.runningTimers.find(
-				(r) => r.projectId === project.id,
-			);
-			if (runningRecord) {
-				await this.stopTimer(runningRecord.id);
-			}
-		} else {
-			await this.startTimer(project.id);
-		}
-	}
-
-	/** check if a project is currently running */
-	isProjectRunning(projectId: number): boolean {
-		return this.runningTimers.some((t) => t.projectId === projectId);
-	}
-
-	/** update a record's title */
-	async updateRecordTitle(recordId: number, title: string): Promise<void> {
-		const index = this.timesheetData.records.findIndex(
-			(r) => r.id === recordId,
-		);
-		if (index !== -1) {
-			this.timesheetData.records[index].title = title;
-			await this.saveTimesheet();
-		}
-	}
-
-	/** get the current running record (first one if multiple) */
-	getCurrentRunningRecord(): TimeRecord | null {
-		const timer = this.runningTimers[0];
-		if (!timer) return null;
-		return (
-			this.timesheetData.records.find((r) => r.id === timer.id) || null
-		);
-	}
-
-	// ----- PROJECT -----
-	getProjectByName(name: string): Project | undefined {
-		if (!this.timesheetData || !this.timesheetData.projects) {
-			return undefined;
-		}
-		return this.timesheetData.projects.find((p) => p.name === name);
-	}
-
-	getProjectById(id: number): Project | undefined {
-		if (!this.timesheetData || !this.timesheetData.projects) {
-			return undefined;
-		}
-		return this.timesheetData.projects.find((p) => p.id === id);
-	}
-
-	async fetchUrl(url: string): Promise<string> {
-		const response = await requestUrl({ url });
-		return response.text;
-	}
-
-	async editProject(project: Project): Promise<void> {
-		const index = this.timesheetData.projects.findIndex(
-			(p) => p.id === project.id,
-		);
-		if (index !== -1) {
-			this.timesheetData.projects[index] = project;
-		}
-		await this.saveTimesheet();
-		// this.refreshViews();
-	}
-
-	// ----- VIEWS -----
-	async activateView() {
-		const { workspace } = this.app;
-
-		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_TIME_TRACKER);
-
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			const rightLeaf = workspace.getRightLeaf(false);
-			if (rightLeaf) {
-				leaf = rightLeaf;
-				await leaf.setViewState({
-					type: VIEW_TYPE_TIME_TRACKER,
-					active: true,
-				});
-			}
-		}
-
-		if (leaf) {
-			void workspace.revealLeaf(leaf);
-		}
-	}
-
-	async activateAnalyticsView() {
-		const { workspace } = this.app;
-
-		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_ANALYTICS);
-
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			leaf = workspace.getLeaf(true);
-			if (leaf) {
-				await leaf.setViewState({
-					type: VIEW_TYPE_ANALYTICS,
-					active: true,
-				});
-			}
-		}
-
-		if (leaf) {
-			void workspace.revealLeaf(leaf);
-		}
-	}
-
-	/** Refresh all open views */
-	refreshViews() {
-		this.app.workspace
-			.getLeavesOfType(VIEW_TYPE_TIME_TRACKER)
-			.forEach((leaf) => {
-				if (leaf.view instanceof TimeTrackerView) {
-					leaf.view.refresh();
-				}
-			});
-
-		this.app.workspace
-			.getLeavesOfType(VIEW_TYPE_ANALYTICS)
-			.forEach((leaf) => {
-				if (leaf.view instanceof AnalyticsView) {
-					leaf.view.refresh();
-				}
-			});
-	}
+    settings: PluginSettings;
+    timesheetData: TimesheetData = {
+        records: [],
+        projects: [],
+        categories: [],
+    };
+    timeblocksData: TimeblocksData = {
+        timeblocks: [],
+    };
+    csvHandler: CSVHandler;
+    backupHandler: BackupHandler;
+    timeblocksHandler: TimeblocksHandler;
+    categoryHandler: CategoryHandler;
+    private timesheetFile: TFile | null = null;
+    private timeblocksFile: TFile | null = null;
+    error: string | null = null;
+    isLoading: boolean = true;
+
+    // cache ics events, dont fetch every time schedule refreshed
+    icsCache: {
+        events: IcsCalendarEvent[];
+        fetched: boolean;
+        loading: boolean;
+    } = {
+        events: [],
+        fetched: false,
+        loading: false,
+    };
+    // schedule view state (fix scroll position)
+    scheduleState: { scrollTop: number } = { scrollTop: 0 };
+
+    // ----- OBSIDIAN FUNCTIONS -----
+    async onload() {
+        await this.loadSettings();
+        this.csvHandler = new CSVHandler(this.app.vault);
+        this.backupHandler = new BackupHandler(this.app);
+        this.timeblocksHandler = new TimeblocksHandler(this.app.vault);
+        this.categoryHandler = new CategoryHandler(this);
+
+        this.registerView(
+            VIEW_TYPE_TIME_TRACKER,
+            (leaf) => new TimeTrackerView(leaf, this),
+        );
+        this.registerView(
+            VIEW_TYPE_ANALYTICS,
+            (leaf) => new AnalyticsView(leaf, this),
+        );
+        this.addRibbonIcon("clock", "Time tracker", async () => {
+            await this.activateView();
+        });
+
+        this.addCommand({
+            id: "open-time-tracking-view",
+            name: "Open time tracking view",
+            callback: async () => await this.activateView(),
+        });
+        this.addCommand({
+            id: "open-analytics-view",
+            name: "Open analytics view",
+            callback: () => this.activateAnalyticsView(),
+        });
+        this.addCommand({
+            id: "track-time",
+            name: "Track time",
+            callback: () =>
+                new CreateRecordModal(this.app, this, () => {}, false).open(),
+        });
+        this.addCommand({
+            id: "import-data",
+            name: "Import data from other apps",
+            callback: () => new ImportModal(this.app, this).open(),
+        });
+        this.addCommand({
+            id: "view-backups",
+            name: "View backups",
+            callback: () => new BackupViewerModal(this.app, this).open(),
+        });
+        this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
+
+        this.app.workspace.onLayoutReady(async () => {
+            await this.loadPluginData();
+            await this.backupHandler.createBackup(this.settings.timesheetPath);
+            await this.activateView();
+        });
+
+        // backup every 3 hours
+        this.registerInterval(
+            window.setInterval(
+                () =>
+                    void this.backupHandler.createBackup(
+                        this.settings.timesheetPath,
+                    ),
+                3 * 60 * 60 * 1000,
+            ),
+        );
+
+        // reload timesheet when app comes back to foreground for mobile
+        this.registerDomEvent(document, "visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                void this.loadPluginData();
+            }
+        });
+
+        // reload timesheet every 30 seconds
+        this.registerInterval(
+            window.setInterval(
+                () => {
+                    void this.loadPluginData();
+                },
+                0.5 * 60 * 1000,
+            ),
+        );
+    }
+
+    async loadPluginData(retries = 5, delay = 500) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                await this.loadTimesheet();
+                await this.loadTimeblocks();
+                return;
+            } catch (err) {
+                if (i < retries - 1) {
+                    await new Promise((r) => setTimeout(r, delay));
+                } else {
+                    new Notice("Error loading plugin data: " + err);
+                }
+            }
+        }
+    }
+
+    async savePluginData() {
+        await this.saveTimesheet();
+        await this.saveTimeblocks();
+    }
+
+    onunload() {
+        void this.savePluginData();
+    }
+
+    // ----- LOADING DATA -----
+    async loadSettings() {
+        this.settings = Object.assign(
+            {},
+            DEFAULT_SETTINGS,
+            (await this.loadData()) || {},
+        ) as PluginSettings;
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    async loadTimesheet() {
+        const hasExistingData =
+            this.timesheetData.records.length > 0 ||
+            this.timesheetData.projects.length > 0;
+
+        // only show loading if no data exists yet
+        if (!hasExistingData) {
+            this.isLoading = true;
+        }
+
+        try {
+            const file = this.app.vault.getAbstractFileByPath(
+                this.settings.timesheetPath,
+            );
+
+            let newData: TimesheetData;
+            if (file instanceof TFile) {
+                this.timesheetFile = file;
+                newData = await this.csvHandler.parseTimesheet(file);
+            } else {
+                this.timesheetFile = await this.csvHandler.createTimesheet(
+                    this.settings.timesheetPath,
+                );
+                newData = await this.csvHandler.parseTimesheet(
+                    this.timesheetFile,
+                );
+            }
+
+            // compare new data with current data, skip refresh if unchanged
+            if (this.isTimesheetDataEqual(this.timesheetData, newData)) {
+                this.isLoading = false;
+                return;
+            }
+
+            // register commands for each new non-archived project
+            for (const project of newData.projects) {
+                if (project.archived) continue;
+                if (
+                    this.timesheetData.projects.find((p) => p.id === project.id)
+                )
+                    continue;
+                const title = this.settings.retroactiveTrackingEnabled
+                    ? "Retroactively track"
+                    : "Start time tracker for";
+                this.addCommand({
+                    id: `track-${project.id}`,
+                    name: `${title} ${project.name}`,
+                    callback: () => this.startTimer(project.id),
+                });
+            }
+
+            this.timesheetData = newData;
+            this.isLoading = false;
+            this.refreshViews();
+        } catch (err) {
+            this.error = "Error loading Timesheet: " + err;
+            this.isLoading = false;
+            this.refreshViews();
+        }
+    }
+
+    private isTimesheetDataEqual(a: TimesheetData, b: TimesheetData): boolean {
+        if (
+            a.records.length !== b.records.length ||
+            a.projects.length !== b.projects.length ||
+            a.categories.length !== b.categories.length
+        ) {
+            return false;
+        }
+
+        // compare records by stringifying (handles Date objects)
+        const aRecords = JSON.stringify(a.records);
+        const bRecords = JSON.stringify(b.records);
+        if (aRecords !== bRecords) return false;
+
+        const aProjects = JSON.stringify(a.projects);
+        const bProjects = JSON.stringify(b.projects);
+        if (aProjects !== bProjects) return false;
+
+        const aCategories = JSON.stringify(a.categories);
+        const bCategories = JSON.stringify(b.categories);
+        if (aCategories !== bCategories) return false;
+
+        return true;
+    }
+
+    async saveTimesheet() {
+        if (!this.timesheetFile) return;
+
+        try {
+            await this.csvHandler.writeTimesheet(
+                this.timesheetFile,
+                this.timesheetData,
+            );
+        } catch (err) {
+            this.error = "Error saving Timesheet: " + err;
+        }
+    }
+
+    // ----- TIMEBLOCKS -----
+    async loadTimeblocks() {
+        try {
+            const file = this.app.vault.getAbstractFileByPath(
+                this.settings.timeblocksPath,
+            );
+
+            let newData: TimeblocksData;
+            if (file instanceof TFile) {
+                this.timeblocksFile = file;
+                newData = await this.timeblocksHandler.parseTimeblocks(file);
+            } else {
+                this.timeblocksFile =
+                    await this.timeblocksHandler.createTimeblocks(
+                        this.settings.timeblocksPath,
+                    );
+                newData = { timeblocks: [] };
+            }
+
+            // skip refresh if unchanged
+            if (
+                JSON.stringify(this.timeblocksData) === JSON.stringify(newData)
+            ) {
+                return;
+            }
+
+            this.timeblocksData = newData;
+        } catch (err) {
+            new Notice("Error loading Timeblocks: " + err);
+        }
+    }
+
+    async saveTimeblocks() {
+        if (!this.timeblocksFile) return;
+
+        try {
+            await this.timeblocksHandler.writeTimeblocks(
+                this.timeblocksFile,
+                this.timeblocksData,
+            );
+        } catch (err) {
+            new Notice("Error saving Timeblocks: " + err);
+        }
+    }
+
+    async createTimeblock(
+        timeblock: Omit<Timeblock, "id">,
+    ): Promise<Timeblock> {
+        const startTime = new Date(timeblock.startTime);
+        startTime.setMilliseconds(0);
+        const endTime = new Date(timeblock.endTime);
+        endTime.setMilliseconds(0);
+
+        const newTimeblock: Timeblock = {
+            id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
+            ...timeblock,
+            startTime,
+            endTime,
+            notes: (timeblock.notes ?? "").toString(),
+        };
+        this.timeblocksData.timeblocks = [
+            ...this.timeblocksData.timeblocks,
+            newTimeblock,
+        ];
+        await this.saveTimeblocks();
+        return newTimeblock;
+    }
+
+    async updateTimeblock(
+        id: number,
+        changes: Partial<Timeblock>,
+    ): Promise<void> {
+        const index = this.timeblocksData.timeblocks.findIndex(
+            (t) => t.id === id,
+        );
+        if (index === -1) return;
+
+        if (changes.startTime) {
+            changes.startTime = new Date(changes.startTime);
+            changes.startTime.setMilliseconds(0);
+        }
+        if (changes.endTime) {
+            changes.endTime = new Date(changes.endTime);
+            changes.endTime.setMilliseconds(0);
+        }
+
+        this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.map(
+            (t, i) => (i === index ? { ...t, ...changes } : t),
+        );
+        await this.saveTimeblocks();
+    }
+
+    async deleteTimeblock(id: number): Promise<void> {
+        this.timeblocksData.timeblocks = this.timeblocksData.timeblocks.filter(
+            (t) => t.id !== id,
+        );
+        await this.saveTimeblocks();
+    }
+
+    getTimeblockById(id: number): Timeblock | undefined {
+        return this.timeblocksData.timeblocks.find((t) => t.id === id);
+    }
+
+    get runningTimers(): TimeRecord[] {
+        if (!this.timesheetData || !this.timesheetData.records) {
+            return [];
+        }
+        return this.timesheetData.records.filter(
+            (record) => record.endTime === null,
+        );
+    }
+
+    // ----- RECORDS -----
+
+    /*
+     * start tracking time without a project
+     * can only be used when retroactive mode is off
+     * @param title - The title of the task being tracked
+     */
+    async startTimerWithoutProject(title: string = "") {
+        if (this.settings.retroactiveTrackingEnabled) {
+            throw new Error(
+                "Cannot start timer without project in retroactive mode",
+            );
+        }
+
+        const now = new Date();
+
+        await this.stopAllTimers();
+
+        // Create a new record with null endTime (running timer) and empty projectName
+        const newRecord: TimeRecord = {
+            id: CSVHandler.getNextId(this.timesheetData.records),
+            projectId: -1,
+            startTime: now,
+            endTime: null,
+            title: title,
+        };
+        this.timesheetData.records.push(newRecord);
+
+        await this.saveTimesheet();
+        this.refreshViews();
+    }
+
+    /** start tracking time for a project */
+    async startTimer(
+        projectId: number = -1,
+        title: string = "",
+        startTime?: Date,
+        endTime?: Date,
+    ) {
+        let project = this.getProjectById(projectId);
+        if (projectId === -1) {
+            project = undefined;
+        }
+
+        const now = new Date();
+
+        // for retroactive
+        if (this.settings.retroactiveTrackingEnabled) {
+            const lastRecord = this.getLastStoppedRecord();
+            if (lastRecord && lastRecord.endTime) {
+                const gap = now.getTime() - lastRecord.endTime.getTime();
+                if (gap > 0) {
+                    // extend record if the project is the same and start time is the same as last project end time(within 10 minutes)
+                    const startTimeSame = startTime
+                        ? Math.abs(
+                              lastRecord.endTime.getTime() -
+                                  startTime.getTime(),
+                          ) <
+                          10 * 60 * 1000
+                        : true;
+                    if (
+                        project &&
+                        lastRecord.projectId === project.id &&
+                        startTimeSame
+                    ) {
+                        const index = this.timesheetData.records.findIndex(
+                            (r) => r.id === lastRecord.id,
+                        );
+                        if (index !== -1) {
+                            this.timesheetData.records[index].endTime =
+                                endTime ?? now;
+                        }
+                    }
+                    // otherwise we create a new record
+                    else {
+                        const newRecord: TimeRecord = {
+                            id: CSVHandler.getNextId(
+                                this.timesheetData.records,
+                            ),
+                            projectId: project ? project.id : -1,
+                            startTime: startTime ?? lastRecord.endTime,
+                            endTime: endTime ?? now,
+                            title: title,
+                        };
+                        this.timesheetData.records.push(newRecord);
+                    }
+                }
+            }
+        } else {
+            await this.stopAllTimers();
+
+            // check if this project is already running
+            const existingTimer = this.runningTimers.find(
+                (t) => t.projectId === projectId,
+            );
+
+            if (existingTimer) {
+                await this.stopTimer(existingTimer.id);
+            } else {
+                // create a new record with null endTime (running timer)
+                const newRecord: TimeRecord = {
+                    id: CSVHandler.getNextId(this.timesheetData.records),
+                    projectId: project ? project.id : -1,
+                    startTime: startTime ?? now,
+                    endTime: null,
+                    title: title,
+                };
+                this.timesheetData.records.push(newRecord);
+            }
+        }
+
+        await this.saveTimesheet();
+        this.refreshViews();
+    }
+
+    /** find record by ID and extend its time */
+    async repeatRecord(recordId: number, endTime: Date) {
+        const record = this.timesheetData.records.find(
+            (r) => r.id === recordId,
+        );
+        if (!record) return;
+
+        if (this.settings.retroactiveTrackingEnabled) {
+            const lastRecord = this.getLastStoppedRecord();
+            if (
+                lastRecord &&
+                lastRecord.projectId === record.projectId &&
+                lastRecord.title === record.title
+            ) {
+                const index = this.timesheetData.records.findIndex(
+                    (r) => r.id === lastRecord.id,
+                );
+                if (index !== -1) {
+                    this.timesheetData.records[index].endTime = new Date();
+                    await this.saveTimesheet();
+                    this.refreshViews();
+                }
+            } else {
+                const now = new Date();
+                const startTime = lastRecord?.endTime || now;
+                const newRecord: TimeRecord = {
+                    id: CSVHandler.getNextId(this.timesheetData.records),
+                    projectId: record.projectId,
+                    startTime: startTime,
+                    endTime: now,
+                    title: record.title,
+                };
+                this.timesheetData.records.push(newRecord);
+                await this.saveTimesheet();
+                this.refreshViews();
+            }
+        } else {
+            if (record.projectId) {
+                await this.startTimer(record.projectId);
+                setTimeout(() => {
+                    void (async () => {
+                        const runningRecord = this.timesheetData.records.find(
+                            (r) =>
+                                r.projectId === record.projectId &&
+                                r.endTime === null,
+                        );
+                        if (runningRecord) {
+                            runningRecord.title = record.title;
+                            await this.saveTimesheet();
+                        }
+                    })();
+                }, 100);
+            } else {
+                await this.startTimerWithoutProject(record.title);
+            }
+        }
+    }
+
+    /** stop a specific timer by record ID */
+    async stopTimer(recordId: number) {
+        const recordIndex = this.timesheetData.records.findIndex(
+            (r) => r.id === recordId && r.endTime === null,
+        );
+
+        if (recordIndex === -1) return;
+
+        this.timesheetData.records[recordIndex].endTime = new Date();
+
+        await this.saveTimesheet();
+        this.refreshViews();
+    }
+
+    /*
+     * edit a specific record
+     * returns true if the record was successfully edited
+     */
+    async editRecord(id: number, changes: TimeRecord): Promise<boolean> {
+        const recordIndex = this.timesheetData.records.findIndex(
+            (r) => r.id === id,
+        );
+        if (recordIndex === -1) return false;
+
+        this.timesheetData.records[recordIndex] = {
+            ...this.timesheetData.records[recordIndex],
+            ...changes,
+        };
+
+        await this.saveTimesheet();
+        // this.refreshViews();
+        return true;
+    }
+
+    /** stop all running timers */
+    async stopAllTimers() {
+        const now = new Date();
+        for (const record of this.timesheetData.records) {
+            if (record.endTime === null) {
+                record.endTime = now;
+            }
+        }
+
+        await this.saveTimesheet();
+        // this.refreshViews();
+    }
+
+    /** set the last stopped record (completed, with endTime) */
+    getLastStoppedRecord(): TimeRecord | null {
+        const completedRecords = this.timesheetData.records.filter(
+            (r) => r.endTime !== null,
+        );
+        if (completedRecords.length === 0) return null;
+
+        return completedRecords.reduce((latest, record) => {
+            if (!latest.endTime) return record;
+            if (!record.endTime) return latest;
+            return record.endTime.getTime() > latest.endTime.getTime()
+                ? record
+                : latest;
+        });
+    }
+
+    /** toggle the last used timer */
+    async toggleLastTimer() {
+        const lastRecord = this.getLastStoppedRecord();
+        if (!lastRecord) return;
+
+        const project = this.getProjectById(lastRecord.projectId);
+        if (!project) return;
+
+        const isRunning = this.runningTimers.some(
+            (t) => t.projectId === project.id,
+        );
+        if (isRunning) {
+            const runningRecord = this.runningTimers.find(
+                (r) => r.projectId === project.id,
+            );
+            if (runningRecord) {
+                await this.stopTimer(runningRecord.id);
+            }
+        } else {
+            await this.startTimer(project.id);
+        }
+    }
+
+    /** check if a project is currently running */
+    isProjectRunning(projectId: number): boolean {
+        return this.runningTimers.some((t) => t.projectId === projectId);
+    }
+
+    /** update a record's title */
+    async updateRecordTitle(recordId: number, title: string): Promise<void> {
+        const index = this.timesheetData.records.findIndex(
+            (r) => r.id === recordId,
+        );
+        if (index !== -1) {
+            this.timesheetData.records[index].title = title;
+            await this.saveTimesheet();
+        }
+    }
+
+    /** get the current running record (first one if multiple) */
+    getCurrentRunningRecord(): TimeRecord | null {
+        const timer = this.runningTimers[0];
+        if (!timer) return null;
+        return (
+            this.timesheetData.records.find((r) => r.id === timer.id) || null
+        );
+    }
+
+    // ----- PROJECT -----
+    getProjectByName(name: string): Project | undefined {
+        if (!this.timesheetData || !this.timesheetData.projects) {
+            return undefined;
+        }
+        return this.timesheetData.projects.find((p) => p.name === name);
+    }
+
+    getProjectById(id: number): Project | undefined {
+        if (!this.timesheetData || !this.timesheetData.projects) {
+            return undefined;
+        }
+        return this.timesheetData.projects.find((p) => p.id === id);
+    }
+
+    async fetchUrl(url: string): Promise<string> {
+        const response = await requestUrl({ url });
+        return response.text;
+    }
+
+    async editProject(project: Project): Promise<void> {
+        const index = this.timesheetData.projects.findIndex(
+            (p) => p.id === project.id,
+        );
+        if (index !== -1) {
+            this.timesheetData.projects[index] = project;
+        }
+        await this.saveTimesheet();
+        // this.refreshViews();
+    }
+
+    // ----- VIEWS -----
+    async activateView() {
+        const { workspace } = this.app;
+
+        let leaf: WorkspaceLeaf | null = null;
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_TIME_TRACKER);
+
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            const rightLeaf = workspace.getRightLeaf(false);
+            if (rightLeaf) {
+                leaf = rightLeaf;
+                await leaf.setViewState({
+                    type: VIEW_TYPE_TIME_TRACKER,
+                    active: true,
+                });
+            }
+        }
+
+        if (leaf) {
+            void workspace.revealLeaf(leaf);
+        }
+    }
+
+    async activateAnalyticsView() {
+        const { workspace } = this.app;
+
+        let leaf: WorkspaceLeaf | null = null;
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_ANALYTICS);
+
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            leaf = workspace.getLeaf(true);
+            if (leaf) {
+                await leaf.setViewState({
+                    type: VIEW_TYPE_ANALYTICS,
+                    active: true,
+                });
+            }
+        }
+
+        if (leaf) {
+            void workspace.revealLeaf(leaf);
+        }
+    }
+
+    /** Refresh all open views */
+    refreshViews() {
+        this.app.workspace
+            .getLeavesOfType(VIEW_TYPE_TIME_TRACKER)
+            .forEach((leaf) => {
+                if (leaf.view instanceof TimeTrackerView) {
+                    leaf.view.refresh();
+                }
+            });
+
+        this.app.workspace
+            .getLeavesOfType(VIEW_TYPE_ANALYTICS)
+            .forEach((leaf) => {
+                if (leaf.view instanceof AnalyticsView) {
+                    leaf.view.refresh();
+                }
+            });
+    }
 }
