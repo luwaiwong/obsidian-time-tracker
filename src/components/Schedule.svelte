@@ -1,474 +1,521 @@
 <script lang="ts">
-	import type TimeTrackerPlugin from "../../main";
-	import type { Project, TimeRecord, Timeblock, IcsCalendarEvent, TrackedCalendarEvent, TimeblockCalendarEvent, CalendarEvent } from "../types";
-	import { formatNaturalDuration } from "../utils/timeUtils";
-	import { icon, yieldToMain } from "../utils/styleUtils";
-	import { Calendar } from "@fullcalendar/core";
-	import timeGridPlugin from "@fullcalendar/timegrid";
-	import interactionPlugin from "@fullcalendar/interaction";
-	import { onMount, onDestroy } from "svelte";
-	import { IcsEventModal } from "../modals/IcsEventModal";
-	import { CreateTimeblockModal } from "../modals/CreateTimeblockModal";
-	import { EditTimeblockModal } from "../modals/EditTimeblockModal";
-	import { Notice } from "obsidian";
-	import { fetchIcsCalendars } from "../handlers/icsHandler";
+    import type TimeTrackerPlugin from "../../main";
+    import type {
+        Project,
+        TimeRecord,
+        Timeblock,
+        IcsCalendarEvent,
+        TrackedCalendarEvent,
+        TimeblockCalendarEvent,
+        CalendarEvent,
+    } from "../types";
+    import { formatNaturalDuration } from "../utils/timeUtils";
+    import { icon, yieldToMain } from "../utils/styleUtils";
+    import { Calendar } from "@fullcalendar/core";
+    import timeGridPlugin from "@fullcalendar/timegrid";
+    import interactionPlugin from "@fullcalendar/interaction";
+    import { onMount, onDestroy } from "svelte";
+    import { IcsEventModal } from "../modals/IcsEventModal";
+    import { CreateTimeblockModal } from "../modals/CreateTimeblockModal";
+    import { EditTimeblockModal } from "../modals/EditTimeblockModal";
+    import { Notice } from "obsidian";
+    import { fetchIcsCalendars } from "../handlers/icsHandler";
+    import { hslToHex } from "../utils/colorUtils";
 
-	interface Props {
-		plugin: TimeTrackerPlugin;
-		onRefresh: () => void;
-		onOpenAnalytics: () => void;
-		onOpenSettings: () => void;
-		onEditRecord: (record: TimeRecord, project: Project) => void;
-	}
+    interface Props {
+        plugin: TimeTrackerPlugin;
+        onRefresh: () => void;
+        onOpenAnalytics: () => void;
+        onOpenSettings: () => void;
+        onEditRecord: (record: TimeRecord, project: Project) => void;
+    }
 
-	let { plugin, onRefresh, onOpenAnalytics, onOpenSettings, onEditRecord }: Props =
-		$props();
+    let {
+        plugin,
+        onRefresh,
+        onOpenAnalytics,
+        onOpenSettings,
+        onEditRecord,
+    }: Props = $props();
 
-	let calendarEl: HTMLDivElement;
-	let calendar: Calendar | null = null;
-	let selectedDate = $state(new Date());
-	let now = $state(Date.now());
-	let interval: number | undefined;
-	let icsEvents = $state<IcsCalendarEvent[]>(plugin.icsCache.events);
-	let icsLoading = $state(false);
-	let zoomLevel = $state(plugin.settings.scheduleZoom);
-	let isUpdatingCalendar = false;
-	let pendingCalendarUpdate = false;
-	let dataVersion = $state(0);
+    let calendarEl: HTMLDivElement;
+    let calendar: Calendar | null = null;
+    let selectedDate = $state(new Date());
+    let now = $state(Date.now());
+    let interval: number | undefined;
+    let icsEvents = $state<IcsCalendarEvent[]>(plugin.icsCache.events);
+    let icsLoading = $state(false);
+    let zoomLevel = $state(plugin.settings.scheduleZoom);
+    let isUpdatingCalendar = false;
+    let pendingCalendarUpdate = false;
+    let dataVersion = $state(0);
 
-	function notifyDataChanged() {
-		dataVersion++;
-	}
+    function notifyDataChanged() {
+        dataVersion++;
+    }
 
-	const ZOOM_LEVELS = [15, 30, 60, 120];
+    const ZOOM_LEVELS = [15, 30, 60, 120];
 
-	// interval setup moved to onMount to prevent recreation on every render
+    // interval setup moved to onMount to prevent recreation on every render
 
-	async function refresh() {
-		await fetchIcsEvents(true);
-		await onRefresh();
-	}
+    async function refresh() {
+        await fetchIcsEvents(true);
+        await onRefresh();
+    }
 
-	function moveDay(delta: number) {
-		const next = new Date(selectedDate);
-		next.setDate(next.getDate() + delta);
-		selectedDate = next;
-		if (calendar) {
-			calendar.gotoDate(next);
-		}
-	}
+    function moveDay(delta: number) {
+        const next = new Date(selectedDate);
+        next.setDate(next.getDate() + delta);
+        selectedDate = next;
+        if (calendar) {
+            calendar.gotoDate(next);
+        }
+    }
 
-	function setToday() {
-		selectedDate = new Date();
-		if (calendar) {
-			calendar.gotoDate(selectedDate);
-		}
-	}
+    function setToday() {
+        selectedDate = new Date();
+        if (calendar) {
+            calendar.gotoDate(selectedDate);
+        }
+    }
 
-	function zoomIn() {
-		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
-		if (idx > 0) {
-			zoomLevel = ZOOM_LEVELS[idx - 1];
-			applyZoom();
-		}
-	}
+    function zoomIn() {
+        const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+        if (idx > 0) {
+            zoomLevel = ZOOM_LEVELS[idx - 1];
+            applyZoom();
+        }
+    }
 
-	function zoomOut() {
-		const idx = ZOOM_LEVELS.indexOf(zoomLevel);
-		if (idx < ZOOM_LEVELS.length - 1) {
-			zoomLevel = ZOOM_LEVELS[idx + 1];
-			applyZoom();
-		}
-	}
+    function zoomOut() {
+        const idx = ZOOM_LEVELS.indexOf(zoomLevel);
+        if (idx < ZOOM_LEVELS.length - 1) {
+            zoomLevel = ZOOM_LEVELS[idx + 1];
+            applyZoom();
+        }
+    }
 
-	function applyZoom() {
-		if (calendar) {
-			const duration = `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`;
-			const snapDuration = `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`;
-			calendar.setOption("slotDuration", duration);
-			calendar.setOption("slotLabelInterval", duration);
-			calendar.setOption("snapDuration", snapDuration);
-		}
-		plugin.settings.scheduleZoom = zoomLevel;
-		plugin.saveSettings();
-	}
+    function applyZoom() {
+        if (calendar) {
+            const duration = `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`;
+            const snapDuration = `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`;
+            calendar.setOption("slotDuration", duration);
+            calendar.setOption("slotLabelInterval", duration);
+            calendar.setOption("snapDuration", snapDuration);
+        }
+        plugin.settings.scheduleZoom = zoomLevel;
+        plugin.saveSettings();
+    }
 
-	function getDayRange(date: Date) {
-		const start = new Date(date);
-		start.setHours(0, 0, 0, 0);
-		const end = new Date(date);
-		end.setHours(23, 59, 59, 999);
-		return { start: start.getTime(), end: end.getTime() };
-	}
+    function getDayRange(date: Date) {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(date);
+        end.setHours(23, 59, 59, 999);
+        return { start: start.getTime(), end: end.getTime() };
+    }
 
-	function buildCalendarEvents() {
-		const events: (TrackedCalendarEvent | TimeblockCalendarEvent)[] = [];
-		const { start, end } = getDayRange(selectedDate);
+    function buildCalendarEvents() {
+        const events: (TrackedCalendarEvent | TimeblockCalendarEvent)[] = [];
+        const { start, end } = getDayRange(selectedDate);
 
-		// Process completed records
-		for (const record of (plugin.timesheetData?.records ?? [])) {
-			if (record.endTime === null) continue;
-			const recordStart = record.startTime.getTime();
-			const recordEnd = record.endTime.getTime();
-			if (recordEnd < start || recordStart > end) continue;
+        // Process completed records
+        for (const record of plugin.timesheetData?.records ?? []) {
+            if (record.endTime === null) continue;
+            const recordStart = record.startTime.getTime();
+            const recordEnd = record.endTime.getTime();
+            if (recordEnd < start || recordStart > end) continue;
 
-			const project = plugin.getProjectById(record.projectId);
-			if (!project) continue;
+            const project = plugin.getProjectById(record.projectId);
+            if (!project) continue;
 
-			const clampedStart = Math.max(recordStart, start);
-			const clampedEnd = Math.min(recordEnd, end);
+            const clampedStart = Math.max(recordStart, start);
+            const clampedEnd = Math.min(recordEnd, end);
 
-			events.push({
-				id: `${record.id}`,
-				title: `${project.icon} ${project.name}`,
-				start: new Date(clampedStart),
-				end: new Date(clampedEnd),
-				backgroundColor: project.color,
-				borderColor: "grey",
-				extendedProps: {
-					project,
-					duration: clampedEnd - clampedStart,
-					isRunning: false,
-					record: record,
-				},
-			});
-		}
+            events.push({
+                id: `${record.id}`,
+                title: `${project.icon} ${project.name}`,
+                start: new Date(clampedStart),
+                end: new Date(clampedEnd),
+                backgroundColor: project.color,
+                borderColor: "grey",
+                extendedProps: {
+                    project,
+                    duration: clampedEnd - clampedStart,
+                    isRunning: false,
+                    record: record,
+                },
+            });
+        }
 
-		// Process running timers
-		for (const timer of plugin.runningTimers || []) {
-			const timerStart = timer.startTime.getTime();
-			if (timerStart > end) continue;
+        // Process running timers
+        for (const timer of plugin.runningTimers || []) {
+            const timerStart = timer.startTime.getTime();
+            if (timerStart > end) continue;
 
-			const project = plugin.getProjectById(timer.projectId);
-			if (!project) continue;
+            const project = plugin.getProjectById(timer.projectId);
+            if (!project) continue;
 
-			const clampedStart = Math.max(timerStart, start);
-			const clampedEnd = Math.min(now, end);
+            const clampedStart = Math.max(timerStart, start);
+            const clampedEnd = Math.min(now, end);
 
-			events.push({
-				id: `running-${timer.projectId}`,
-				title: `${project.icon} ${project.name} (Running)`,
-				start: new Date(clampedStart),
-				end: new Date(clampedEnd),
-				backgroundColor: project.color,
-				borderColor: project.color,
-				extendedProps: {
-					project,
-					duration: clampedEnd - clampedStart,
-					isRunning: true,
-					record: timer,
-				},
-			});
-		}
+            events.push({
+                id: `running-${timer.projectId}`,
+                title: `${project.icon} ${project.name} (Running)`,
+                start: new Date(clampedStart),
+                end: new Date(clampedEnd),
+                backgroundColor: project.color,
+                borderColor: project.color,
+                extendedProps: {
+                    project,
+                    duration: clampedEnd - clampedStart,
+                    isRunning: true,
+                    record: timer,
+                },
+            });
+        }
 
-		// process timeblocks (only if enabled)
-		if (!plugin.settings.enableTimeblocking) return events;
-		for (const timeblock of (plugin.timeblocksData?.timeblocks ?? [])) {
-			const tbStart = timeblock.startTime.getTime();
-			const tbEnd = timeblock.endTime.getTime();
-			if (tbEnd < start || tbStart > end) continue;
+        // process timeblocks (only if enabled)
+        if (!plugin.settings.enableTimeblocking) return events;
+        for (const timeblock of plugin.timeblocksData?.timeblocks ?? []) {
+            const tbStart = timeblock.startTime.getTime();
+            const tbEnd = timeblock.endTime.getTime();
+            if (tbEnd < start || tbStart > end) continue;
 
-			const clampedStart = new Date(Math.max(tbStart, start));
-			const clampedEnd = new Date(Math.min(tbEnd, end));
+            const clampedStart = new Date(Math.max(tbStart, start));
+            const clampedEnd = new Date(Math.min(tbEnd, end));
 
-			events.push(buildTimeblockEvent(timeblock, clampedStart, clampedEnd));
-		}
+            events.push(
+                buildTimeblockEvent(timeblock, clampedStart, clampedEnd),
+            );
+        }
 
-		return events;
-	}
+        return events;
+    }
 
-	function buildTimeblockEvent(timeblock: Timeblock, start?: Date, end?: Date): TimeblockCalendarEvent {
-		const color = timeblock.color;
-		const eventStart = start ?? timeblock.startTime;
-		const eventEnd = end ?? timeblock.endTime;
-		return {
-			id: `timeblock-${timeblock.id}`,
-			title: timeblock.title,
-			start: eventStart,
-			end: eventEnd,
-			backgroundColor: `${color}80`,
-			borderColor: color,
-			classNames: ["timeblock-event"],
-			editable: true,
-			durationEditable: true,
-			extendedProps: {
-				isTimeblock: true,
-				timeblock: timeblock,
-				color: color,
-				duration: eventEnd.getTime() - eventStart.getTime(),
-			},
-		};
-	}
+    function buildTimeblockEvent(
+        timeblock: Timeblock,
+        start?: Date,
+        end?: Date,
+    ): TimeblockCalendarEvent {
+        const color = timeblock.color;
+        const eventStart = start ?? timeblock.startTime;
+        const eventEnd = end ?? timeblock.endTime;
+        return {
+            id: `timeblock-${timeblock.id}`,
+            title: timeblock.title,
+            start: eventStart,
+            end: eventEnd,
+            backgroundColor: `${color}80`,
+            borderColor: color,
+            classNames: ["timeblock-event"],
+            editable: true,
+            durationEditable: true,
+            extendedProps: {
+                isTimeblock: true,
+                timeblock: timeblock,
+                color: color,
+                duration: eventEnd.getTime() - eventStart.getTime(),
+            },
+        };
+    }
 
+    async function fetchIcsEvents(force = false) {
+        if (force) {
+            // reset stuck loading state and allow re-fetch
+            plugin.icsCache.fetched = false;
+            plugin.icsCache.loading = false;
+        }
 
+        if (plugin.icsCache.fetched) {
+            return;
+        }
+        if (plugin.icsCache.loading) {
+            return; // prevent concurrent fetches
+        }
 
+        icsLoading = true;
+        await fetchIcsCalendars(plugin);
+        icsEvents = plugin.icsCache.events;
+        icsLoading = false;
+        await updateCalendarEvents();
+    }
 
-	async function fetchIcsEvents(force = false) {
-		if (force) {
-			// reset stuck loading state and allow re-fetch
-			plugin.icsCache.fetched = false;
-			plugin.icsCache.loading = false;
-		}
+    function reloadIcsCalendars() {
+        fetchIcsEvents(true);
+    }
 
-		if (plugin.icsCache.fetched) {
-			return;
-		}
-		if (plugin.icsCache.loading) {
-			return; // prevent concurrent fetches
-		}
+    async function updateCalendarEvents() {
+        if (!calendar) return;
+        if (isUpdatingCalendar) {
+            pendingCalendarUpdate = true;
+            return;
+        }
 
-		icsLoading = true;
-		await fetchIcsCalendars(plugin);
-		icsEvents = plugin.icsCache.events;
-		icsLoading = false;
-		await updateCalendarEvents();
-	}
+        isUpdatingCalendar = true;
+        pendingCalendarUpdate = false;
 
-	function reloadIcsCalendars() {
-		fetchIcsEvents(true);
-	}
+        try {
+            const trackerEvents = buildCalendarEvents();
+            const allEvents = [...trackerEvents, ...icsEvents];
+            const currentEvents = calendar.getEvents();
 
-	async function updateCalendarEvents() {
-		if (!calendar) return;
-		if (isUpdatingCalendar) {
-			pendingCalendarUpdate = true;
-			return;
-		}
+            // more efficient lookups
+            const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
+            const currentEventsMap = new Map(
+                currentEvents.map((e) => [e.id, e]),
+            );
 
-		isUpdatingCalendar = true;
-		pendingCalendarUpdate = false;
+            // collect events to add
+            const eventsToAdd: CalendarEvent[] = [];
+            for (const newEvent of allEvents) {
+                const existing = currentEventsMap.get(newEvent.id);
+                if (existing) {
+                    const newStart =
+                        newEvent.start instanceof Date
+                            ? newEvent.start.getTime()
+                            : new Date(newEvent.start as string).getTime();
+                    const newEnd =
+                        newEvent.end instanceof Date
+                            ? newEvent.end.getTime()
+                            : new Date(newEvent.end as string).getTime();
 
-		try {
-			const trackerEvents = buildCalendarEvents();
-			const allEvents = [...trackerEvents, ...icsEvents];
-			const currentEvents = calendar.getEvents();
+                    if (
+                        existing.start?.getTime() !== newStart ||
+                        existing.end?.getTime() !== newEnd
+                    ) {
+                        existing.setDates(newEvent.start, newEvent.end);
+                    }
+                    if (existing.title !== newEvent.title) {
+                        existing.setProp("title", newEvent.title);
+                    }
+                    if (existing.backgroundColor !== newEvent.backgroundColor) {
+                        existing.setProp(
+                            "backgroundColor",
+                            newEvent.backgroundColor,
+                        );
+                    }
+                    if (existing.borderColor !== newEvent.borderColor) {
+                        existing.setProp("borderColor", newEvent.borderColor);
+                    }
+                    if ("isTimeblock" in newEvent.extendedProps) {
+                        existing.setExtendedProp(
+                            "timeblock",
+                            newEvent.extendedProps.timeblock,
+                        );
+                        existing.setExtendedProp(
+                            "color",
+                            newEvent.extendedProps.color,
+                        );
+                        existing.setExtendedProp(
+                            "duration",
+                            newEvent.extendedProps.duration,
+                        );
+                    }
+                } else {
+                    eventsToAdd.push(newEvent);
+                }
+            }
 
-			// more efficient lookups
-			const allEventsMap = new Map(allEvents.map((e) => [e.id, e]));
-			const currentEventsMap = new Map(currentEvents.map((e) => [e.id, e]));
+            // add events in chunks to avoid blocking UI
+            const CHUNK_SIZE = 10;
+            for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
+                const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
+                for (const event of chunk) {
+                    calendar.addEvent(event);
+                }
+                if (i + CHUNK_SIZE < eventsToAdd.length) {
+                    await yieldToMain();
+                }
+            }
 
-			// collect events to add
-			const eventsToAdd: CalendarEvent[] = [];
-			for (const newEvent of allEvents) {
-				const existing = currentEventsMap.get(newEvent.id);
-				if (existing) {
-					const newStart = newEvent.start instanceof Date ? newEvent.start.getTime() : new Date(newEvent.start as string).getTime();
-					const newEnd = newEvent.end instanceof Date ? newEvent.end.getTime() : new Date(newEvent.end as string).getTime();
+            // remove events that no longer exist
+            for (const existing of currentEvents) {
+                if (!allEventsMap.has(existing.id)) {
+                    existing.remove();
+                }
+            }
+        } finally {
+            isUpdatingCalendar = false;
+            // if another update was requested while we were busy, run it now
+            if (pendingCalendarUpdate) {
+                pendingCalendarUpdate = false;
+                updateCalendarEvents();
+            }
+        }
+    }
 
-					if (existing.start?.getTime() !== newStart || existing.end?.getTime() !== newEnd) {
-						existing.setDates(newEvent.start, newEvent.end);
-					}
-					if (existing.title !== newEvent.title) {
-						existing.setProp('title', newEvent.title);
-					}
-					if (existing.backgroundColor !== newEvent.backgroundColor) {
-						existing.setProp('backgroundColor', newEvent.backgroundColor);
-					}
-					if (existing.borderColor !== newEvent.borderColor) {
-						existing.setProp('borderColor', newEvent.borderColor);
-					}
-					if ('isTimeblock' in newEvent.extendedProps) {
-						existing.setExtendedProp('timeblock', newEvent.extendedProps.timeblock);
-						existing.setExtendedProp('color', newEvent.extendedProps.color);
-						existing.setExtendedProp('duration', newEvent.extendedProps.duration);
-					}
-				} else {
-					eventsToAdd.push(newEvent);
-				}
-			}
+    let resizeObserver: ResizeObserver | null = null;
 
-			// add events in chunks to avoid blocking UI
-			const CHUNK_SIZE = 10;
-			for (let i = 0; i < eventsToAdd.length; i += CHUNK_SIZE) {
-				const chunk = eventsToAdd.slice(i, i + CHUNK_SIZE);
-				for (const event of chunk) {
-					calendar.addEvent(event);
-				}
-				if (i + CHUNK_SIZE < eventsToAdd.length) {
-					await yieldToMain();
-				}
-			}
+    function getCurrentScrollTime(): string {
+        const now = new Date();
+        const hours = now.getHours();
+        // scroll to current time, clamped to 23:00 + scroll offset
 
-			// remove events that no longer exist
-			for (const existing of currentEvents) {
-				if (!allEventsMap.has(existing.id)) {
-					existing.remove();
-				}
-			}
-		} finally {
-			isUpdatingCalendar = false;
-			// if another update was requested while we were busy, run it now
-			if (pendingCalendarUpdate) {
-				pendingCalendarUpdate = false;
-				updateCalendarEvents();
-			}
-		}
-	}
+        const scrollHour = Math.max(0, hours - 1);
+        return `${String(scrollHour).padStart(2, "0")}:00:00`;
+    }
 
-	let resizeObserver: ResizeObserver | null = null;
+    onMount(() => {
+        calendar = new Calendar(calendarEl, {
+            plugins: [timeGridPlugin, interactionPlugin],
+            initialView: "timeGridDay",
+            initialDate: selectedDate,
+            headerToolbar: false,
+            height: "100%",
+            slotMinTime: "00:00:00",
+            slotMaxTime: "24:00:00",
+            slotDuration: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+            slotLabelInterval: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
+            snapDuration: `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`,
+            allDaySlot: false,
+            nowIndicator: true,
+            scrollTime: getCurrentScrollTime(),
+            slotLabelFormat: {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+            },
+            eventTimeFormat: {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+            },
+            dayHeaderFormat: {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+            },
+            eventMinHeight: 0,
+            eventShortHeight: 100000,
+            selectable: plugin.settings.enableTimeblocking,
+            selectMirror: true,
+            selectMinDistance: 5,
+            events: [...buildCalendarEvents(), ...icsEvents],
+            select: async (info) => {
+                if (!plugin.settings.enableTimeblocking) return;
+                await plugin.createTimeblock({
+                    title: "",
+                    startTime: info.start,
+                    endTime: info.end,
+                    color: getComputedStyle(document.body)
+                        .getPropertyValue("--interactive-accent")
+                        .trim(),
+                    notes: "",
+                });
+                calendar?.unselect();
+                notifyDataChanged();
+            },
+            dateClick(arg) {
+                if (!plugin.settings.enableTimeblocking) return;
+                const startDate = arg.date;
+                const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+                new CreateTimeblockModal(
+                    plugin.app,
+                    plugin,
+                    startDate,
+                    endDate,
+                    () => notifyDataChanged(),
+                ).open();
+            },
+            eventClick: (info) => {
+                const props = info.event.extendedProps;
+                if (props?.isIcs) {
+                    new IcsEventModal(plugin.app, {
+                        title: info.event.title,
+                        start: info.event.start,
+                        end: info.event.end,
+                        description: props.description,
+                        location: props.location,
+                        url: props.url,
+                        color: props.color,
+                        sourceName: props.sourceName,
+                    }).open();
+                } else if (props?.isTimeblock && props?.timeblock) {
+                    if (!plugin.settings.enableTimeblocking) return;
+                    const currentTimeblock = plugin.getTimeblockById(
+                        props.timeblock.id,
+                    );
+                    if (!currentTimeblock) return;
+                    new EditTimeblockModal(
+                        plugin.app,
+                        plugin,
+                        currentTimeblock,
+                        () => notifyDataChanged(),
+                        () => notifyDataChanged(),
+                    ).open();
+                } else if (props?.project && props?.record) {
+                    onEditRecord(props.record, props.project);
+                }
+            },
+            eventDrop: async (info) => {
+                const props = info.event.extendedProps;
+                if (props?.isTimeblock && props?.timeblock) {
+                    if (!plugin.settings.enableTimeblocking) {
+                        info.revert();
+                        return;
+                    }
 
-	function getCurrentScrollTime(): string {
-		const now = new Date();
-		const hours = now.getHours();
-		// scroll to current time, clamped to 23:00 + scroll offset
+                    // snap snart to the nearest half slot
+                    const slotDuration = zoomLevel / 2;
+                    const startTime = new Date(info.event.start!);
+                    startTime.setMinutes(
+                        Math.floor(startTime.getMinutes() / slotDuration) *
+                            slotDuration,
+                    );
 
-		const scrollHour = Math.max(0, hours - 1);
-		return `${String(scrollHour).padStart(2, "0")}:00:00`;
-	}
+                    info.event.setStart(startTime);
+                    await plugin.updateTimeblock(props.timeblock.id, {
+                        startTime: startTime,
+                        endTime: info.event.end!,
+                    });
+                    notifyDataChanged();
+                } else {
+                    info.revert();
+                }
+            },
+            eventResize: async (info) => {
+                const props = info.event.extendedProps;
+                if (props?.isTimeblock && props?.timeblock) {
+                    if (!plugin.settings.enableTimeblocking) {
+                        info.revert();
+                        return;
+                    }
+                    await plugin.updateTimeblock(props.timeblock.id, {
+                        startTime: info.event.start!,
+                        endTime: info.event.end!,
+                    });
+                    notifyDataChanged();
+                } else {
+                    info.revert();
+                }
+            },
+            eventContent: (arg) => {
+                const props = arg.event.extendedProps;
+                let duration = props?.duration || null;
 
-	onMount(() => {
-		calendar = new Calendar(calendarEl, {
-			plugins: [timeGridPlugin, interactionPlugin],
-			initialView: "timeGridDay",
-			initialDate: selectedDate,
-			headerToolbar: false,
-			height: "100%",
-			slotMinTime: "00:00:00",
-			slotMaxTime: "24:00:00",
-			slotDuration: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
-			slotLabelInterval: `${String(Math.floor(zoomLevel / 60)).padStart(2, "0")}:${String(zoomLevel % 60).padStart(2, "0")}:00`,
-			snapDuration: `${String(Math.floor(zoomLevel / 2 / 60)).padStart(2, "0")}:${String((zoomLevel / 2) % 60).padStart(2, "0")}:00`,
-			allDaySlot: false,
-			nowIndicator: true,
-			scrollTime: getCurrentScrollTime(),
-			slotLabelFormat: {
-				hour: "2-digit",
-				minute: "2-digit",
-				hour12: false,
-			},
-			eventTimeFormat: {
-				hour: "2-digit",
-				minute: "2-digit",
-				hour12: false,
-			},
-			dayHeaderFormat: {
-				weekday: "long",
-				month: "long",
-				day: "numeric",
-				year: "numeric",
-			},
-			eventMinHeight: 0,
-			eventShortHeight: 100000,
-			selectable: plugin.settings.enableTimeblocking,
-			selectMirror: true,
-			selectMinDistance: 5,
-			events: [...buildCalendarEvents(), ...icsEvents],
-			select: async (info) => {
-				if (!plugin.settings.enableTimeblocking) return;
-				await plugin.createTimeblock({
-					title: "",
-					startTime: info.start,
-					endTime: info.end,
-					color: getComputedStyle(document.body).getPropertyValue('--interactive-accent').trim(),
-					notes: "",
-				});
-				calendar?.unselect();
-				notifyDataChanged();
-			},
-			dateClick(arg) {
-				if (!plugin.settings.enableTimeblocking) return;
-				const startDate = arg.date;
-				const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-				new CreateTimeblockModal(
-					plugin.app,
-					plugin,
-					startDate,
-					endDate,
-					() => notifyDataChanged(),
-				).open();
-			},
-			eventClick: (info) => {
-				const props = info.event.extendedProps;
-				if (props?.isIcs) {
-					new IcsEventModal(plugin.app, {
-						title: info.event.title,
-						start: info.event.start,
-						end: info.event.end,
-						description: props.description,
-						location: props.location,
-						url: props.url,
-						color: props.color,
-						sourceName: props.sourceName,
-					}).open();
-				} else if (props?.isTimeblock && props?.timeblock) {
-					if (!plugin.settings.enableTimeblocking) return;
-					const currentTimeblock = plugin.getTimeblockById(props.timeblock.id);
-					if (!currentTimeblock) return;
-					new EditTimeblockModal(
-						plugin.app,
-						plugin,
-						currentTimeblock,
-						() => notifyDataChanged(),
-						() => notifyDataChanged(),
-					).open();
-				} else if (props?.project && props?.record) {
-					onEditRecord(props.record, props.project);
-				}
-			},
-			eventDrop: async (info) => {
-				const props = info.event.extendedProps;
-				if (props?.isTimeblock && props?.timeblock) {
-					if (!plugin.settings.enableTimeblocking) {
-						info.revert();
-						return;
-					}
-					
-					// snap snart to the nearest half slot
-					const slotDuration = zoomLevel / 2 ;
-					const startTime = new Date(info.event.start!);
-					startTime.setMinutes(Math.floor(startTime.getMinutes() / slotDuration) * slotDuration);
+                // calculate duration if not provided
+                if (duration == null) {
+                    const start = arg.event.start;
+                    const end = arg.event.end;
+                    if (start && end) {
+                        duration = end.getTime() - start.getTime();
+                    } else {
+                        duration = 0;
+                    }
+                }
 
-					info.event.setStart(startTime);					
-					await plugin.updateTimeblock(props.timeblock.id, {
-						startTime: startTime,
-						endTime: info.event.end!,
-					});
-					notifyDataChanged();
-				} else {
-					info.revert();
-				}
-			},
-			eventResize: async (info) => {
-				const props = info.event.extendedProps;
-				if (props?.isTimeblock && props?.timeblock) {
-					if (!plugin.settings.enableTimeblocking) {
-						info.revert();
-						return;
-					}
-					await plugin.updateTimeblock(props.timeblock.id, {
-						startTime: info.event.start!,
-						endTime: info.event.end!,
-					});
-					notifyDataChanged();
-				} else {
-					info.revert();
-				}
-			},
-			eventContent: (arg) => {
-				const props = arg.event.extendedProps;
-				let duration = props?.duration || null;
+                // thresholds based on zoom level (in ms)
+                const slotMs = zoomLevel * 60 * 1000;
+                const minimizeThreshold = slotMs / 2; // minimize if less than half a slot
+                const compactThreshold = slotMs * 1.5; // compact if less than 1.5 slots
 
-				// calculate duration if not provided
-				if (duration == null) {
-					const start = arg.event.start;
-					const end = arg.event.end;
-					if (start && end) {
-						duration = end.getTime() - start.getTime();
-					} else {
-						duration = 0;
-					}
-				}
-
-				// thresholds based on zoom level (in ms)
-				const slotMs = zoomLevel * 60 * 1000;
-				const minimizeThreshold = slotMs / 2; // minimize if less than half a slot
-				const compactThreshold = slotMs * 1.5; // compact if less than 1.5 slots
-
-				// ics events
-				if (props?.isIcs) {
-					if (duration != 0 && duration < compactThreshold) {
-						return {
-							html: `
+                // ics events
+                if (props?.isIcs) {
+                    if (duration != 0 && duration < compactThreshold) {
+                        return {
+                            html: `
 								<div class="flex flex-col justify-center p-0 pl-1 w-full h-full overflow-hidden">
 									${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
 									<div class="flex flex-row gap-1 justify-start items-center whitespace-nowrap">
@@ -477,11 +524,11 @@
 									</div>
 								</div>
 							`,
-						};
-					}
+                        };
+                    }
 
-					return {
-						html: `
+                    return {
+                        html: `
 							<div class="flex flex-column gap-0.5 justify-start items-start p-0 pl-1 w-full h-full"
 							style="flex-direction: column;">
 								${props.sourceName ? `<div class="text-xs opacity-70 truncate w-full">${props.sourceName}</div>` : ""}
@@ -489,59 +536,59 @@
 								<div class="text-sm opacity-95">${arg.timeText}</div>
 							</div>
 						`,
-					};
-				} else if (props?.isTimeblock) {
-					// timeblock events
-					const color = props.color || "#6b7280";
-					const notes = props.timeblock?.notes;
+                    };
+                } else if (props?.isTimeblock) {
+                    // timeblock events
+                    const color = props.color || "#6b7280";
+                    const notes = props.timeblock?.notes;
 
-					if (duration < minimizeThreshold) {
-						return {
-							html: `
+                    if (duration < minimizeThreshold) {
+                        return {
+                            html: `
 								<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
 									<div class="font-bold text-sm truncate mt-0">${arg.event.title}</div>
 								</div>
 							`,
-						};
-					}
+                        };
+                    }
 
-					let notesHtml = "";
-					if (notes) {
-						const formattedNotes = notes.replace(/\n/g, "<br>");
-						notesHtml = `<div class="text-xs opacity-70 mt-0 overflow-hidden">${formattedNotes}</div>`;
-					}
+                    let notesHtml = "";
+                    if (notes) {
+                        const formattedNotes = notes.replace(/\n/g, "<br>");
+                        notesHtml = `<div class="text-xs opacity-70 mt-0 overflow-hidden">${formattedNotes}</div>`;
+                    }
 
-					return {
-						html: `
+                    return {
+                        html: `
 							<div class="timeblock-content" style="border-left: 3px solid ${color}; padding-top: 0; ">
 								<div class="font-bold text-sm mt-0">${arg.event.title}</div>
 								${notesHtml}
 							</div>
 						`,
-					};
-				} else {
-					// time tracker events - minimize if less than threshold
-					if (duration < minimizeThreshold) {
-						return {
-							html: `<div class="flex flex-col gap-0.5"></div>`,
-						};
-					}
+                    };
+                } else {
+                    // time tracker events - minimize if less than threshold
+                    if (duration < minimizeThreshold) {
+                        return {
+                            html: `<div class="flex flex-col gap-0.5"></div>`,
+                        };
+                    }
 
-					// time tracker events - compact view
-					if (duration < compactThreshold) {
-						return {
-							html: `
+                    // time tracker events - compact view
+                    if (duration < compactThreshold) {
+                        return {
+                            html: `
 								<div class="flex flex-row gap-1 justify-start items-center p-0 w-full"
 								style="padding: 0;">
 									<div class="font-bold text-sm">${arg.event.title}: </div>
 									<div class="text-sm opacity-95">${formatNaturalDuration(duration)}</div>
 								</div>
 							`,
-						};
-					}
-					// time tracker events - full view
-					return {
-						html: `
+                        };
+                    }
+                    // time tracker events - full view
+                    return {
+                        html: `
 							<div class="flex flex-column justify-start items-center p-0 w-full"
 							style="flex-direction: column; align-items: flex-start;">
 								<div class="font-bold text-sm">${arg.event.title} </div>
@@ -549,98 +596,100 @@
 								<div class="text-sm opacity-95">${arg.timeText}</div>
 							</div>
 						`,
-					};
-				}
+                    };
+                }
+            },
+        });
+        calendar.render();
 
-			},
-		});
-		calendar.render();
+        // restore scroll position if available
+        if (plugin.scheduleState.scrollTop > 0) {
+            const scroller = calendarEl.querySelector(
+                ".fc-scroller-liquid-absolute",
+            );
+            if (scroller) {
+                scroller.scrollTop = plugin.scheduleState.scrollTop;
+            }
+        }
 
-		// restore scroll position if available
-		if (plugin.scheduleState.scrollTop > 0) {
-			const scroller = calendarEl.querySelector(".fc-scroller-liquid-absolute");
-			if (scroller) {
-				scroller.scrollTop = plugin.scheduleState.scrollTop;
-			}
-		}
+        // fetch ICS if not already cached (events already included in initial render if cached)
+        if (!plugin.icsCache.fetched) {
+            fetchIcsEvents(true);
+        }
 
-		// fetch ICS if not already cached (events already included in initial render if cached)
-		if (!plugin.icsCache.fetched) {
-			fetchIcsEvents(true);
-		}
+        // update time every 30s for running timers (effect handles calendar update via `now` dependency)
+        interval = window.setInterval(() => {
+            now = Date.now();
+        }, 1000 * 30);
 
-		// update time every 30s for running timers (effect handles calendar update via `now` dependency)
-		interval = window.setInterval(() => {
-			now = Date.now();
-		}, 1000 * 30);
+        // watch for container resize to update calendar dimensions
+        resizeObserver = new ResizeObserver(() => {
+            if (calendar) {
+                calendar.updateSize();
+            }
+        });
+        resizeObserver.observe(calendarEl);
+    });
 
-		// watch for container resize to update calendar dimensions
-		resizeObserver = new ResizeObserver(() => {
-			if (calendar) {
-				calendar.updateSize();
-			}
-		});
-		resizeObserver.observe(calendarEl);
-	});
+    onDestroy(() => {
+        // save scroll position before destroy
+        const scroller = calendarEl?.querySelector(
+            ".fc-scroller-liquid-absolute",
+        );
+        if (scroller) {
+            plugin.scheduleState.scrollTop = scroller.scrollTop;
+        }
 
-	onDestroy(() => {
-		// save scroll position before destroy
-		const scroller = calendarEl?.querySelector(".fc-scroller-liquid-absolute");
-		if (scroller) {
-			plugin.scheduleState.scrollTop = scroller.scrollTop;
-		}
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+        }
+        if (calendar) {
+            calendar.destroy();
+        }
+        if (interval) {
+            clearInterval(interval);
+        }
+    });
 
-		if (resizeObserver) {
-			resizeObserver.disconnect();
-		}
-		if (calendar) {
-			calendar.destroy();
-		}
-		if (interval) {
-			clearInterval(interval);
-		}
-	});
-
-	// Update events when data changes
-	$effect(() => {
-		selectedDate;
-		icsEvents;
-		now;
-		dataVersion;
-		updateCalendarEvents();
-	});
+    // Update events when data changes
+    $effect(() => {
+        selectedDate;
+        icsEvents;
+        now;
+        dataVersion;
+        updateCalendarEvents();
+    });
 </script>
 
 <div class="flex flex-col gap-3 h-full w-full p-3 box-border overflow-hidden">
-	<div class="flex justify-between items-center gap-1 w-full">
-		<div class=" flex justify-center items-center gap-1">
-			<button
-				class="bg-transparent shrink-0"
-				style="cursor: pointer; padding: 4px"
-				onclick={() => moveDay(-1)}
-				aria-label="Previous day"
-				{@attach icon("chevron-left")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				style="cursor: pointer; padding: 6px"
-				onclick={setToday}
-				aria-label="Go to today"
-				{@attach icon("calendar-check")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				style="cursor: pointer; padding: 4px"
-				onclick={() => moveDay(1)}
-				aria-label="Next day"
-				{@attach icon("chevron-right")}
-			></button>
-		</div>
-		<div class="flex justify-end items-center gap-1">	
-
-			<button
-				class="shrink-0"
-				style="
+    <div class="flex justify-between items-center gap-1 w-full">
+        <div class=" flex justify-center items-center gap-1">
+            <button
+                class="bg-transparent shrink-0"
+                style="cursor: pointer; padding: 4px"
+                onclick={() => moveDay(-1)}
+                aria-label="Previous day"
+                {@attach icon("chevron-left")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0"
+                style="cursor: pointer; padding: 6px"
+                onclick={setToday}
+                aria-label="Go to today"
+                {@attach icon("calendar-check")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0"
+                style="cursor: pointer; padding: 4px"
+                onclick={() => moveDay(1)}
+                aria-label="Next day"
+                {@attach icon("chevron-right")}
+            ></button>
+        </div>
+        <div class="flex justify-end items-center gap-1">
+            <button
+                class="shrink-0"
+                style="
 					background-color: transparent;
 					border: none;
 					padding: 6px;
@@ -648,15 +697,16 @@
 					cursor: pointer;
 
 				"
-				aria-label="Zoom out"
-				onclick={zoomOut}
-				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === ZOOM_LEVELS.length - 1}
-				{@attach icon("zoom-out")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				aria-label="Zoom in"
-				style="
+                aria-label="Zoom out"
+                onclick={zoomOut}
+                disabled={ZOOM_LEVELS.indexOf(zoomLevel) ===
+                    ZOOM_LEVELS.length - 1}
+                {@attach icon("zoom-out")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0"
+                aria-label="Zoom in"
+                style="
 					background-color: transparent;
 					border: none;
 					padding: 6px;
@@ -664,13 +714,15 @@
 					cursor: pointer;
 
 				"
-				onclick={zoomIn}
-				disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
-				{@attach icon("zoom-in")}
-			></button>
-			<button
-				class="bg-transparent shrink-0 {icsLoading ? 'ics-loading' : ''}"
-				style="
+                onclick={zoomIn}
+                disabled={ZOOM_LEVELS.indexOf(zoomLevel) === 0}
+                {@attach icon("zoom-in")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0 {icsLoading
+                    ? 'ics-loading'
+                    : ''}"
+                style="
 					background-color: transparent;
 					border: none;
 					padding: 6px;
@@ -678,13 +730,13 @@
 					cursor: pointer;
 
 				"
-				aria-label="Refresh"
-				onclick={refresh}
-				{@attach icon("refresh-ccw")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				style="
+                aria-label="Refresh"
+                onclick={refresh}
+                {@attach icon("refresh-ccw")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0"
+                style="
 					background-color: transparent;
 					border: none;
 					padding: 6px;
@@ -692,13 +744,13 @@
 					cursor: pointer;
 
 				"
-				aria-label="Open Analytics"
-				onclick={onOpenAnalytics}
-				{@attach icon("bar-chart-2")}
-			></button>
-			<button
-				class="bg-transparent shrink-0"
-				style="
+                aria-label="Open Analytics"
+                onclick={onOpenAnalytics}
+                {@attach icon("bar-chart-2")}
+            ></button>
+            <button
+                class="bg-transparent shrink-0"
+                style="
 					background-color: transparent;
 					border: none;
 					padding: 6px;
@@ -706,129 +758,129 @@
 					cursor: pointer;
 
 				"
-				aria-label="Open Settings"
-				onclick={onOpenSettings}
-				{@attach icon("settings")}
-			></button>
-		</div>
-	</div>
+                aria-label="Open Settings"
+                onclick={onOpenSettings}
+                {@attach icon("settings")}
+            ></button>
+        </div>
+    </div>
 
-	<div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>
+    <div class="flex-1 min-h-0 overflow-auto" bind:this={calendarEl}></div>
 </div>
 
 <style>
-	/* FullCalendar customization */
-	:global(.fc) {
-		height: 100%;
-		font-family: var(--font-interface);
-	}
+    /* FullCalendar customization */
+    :global(.fc) {
+        height: 100%;
+        font-family: var(--font-interface);
+    }
 
-	:global(.fc .fc-timegrid-slot) {
-		height: 48px;
-	}
+    :global(.fc .fc-timegrid-slot) {
+        height: 48px;
+    }
 
-	:global(.fc .fc-timegrid-slot-label) {
-		color: var(--text-muted);
-		font-size: 0.85em;
-	}
+    :global(.fc .fc-timegrid-slot-label) {
+        color: var(--text-muted);
+        font-size: 0.85em;
+    }
 
-	:global(.fc .fc-timegrid-divider) {
-		display: none;
-	}
+    :global(.fc .fc-timegrid-divider) {
+        display: none;
+    }
 
-	:global(.fc .fc-scrollgrid) {
-		border-color: var(--background-modifier-border);
-	}
+    :global(.fc .fc-scrollgrid) {
+        border-color: var(--background-modifier-border);
+    }
 
-	:global(.fc .fc-scrollgrid td) {
-		border-color: var(--background-modifier-border);
-	}
+    :global(.fc .fc-scrollgrid td) {
+        border-color: var(--background-modifier-border);
+    }
 
-	:global(.fc .fc-timegrid-axis) {
-		background: var(--background-primary);
-	}
+    :global(.fc .fc-timegrid-axis) {
+        background: var(--background-primary);
+    }
 
-	:global(.fc .fc-timegrid-slot-lane) {
-		background: var(--background-secondary);
-	}
+    :global(.fc .fc-timegrid-slot-lane) {
+        background: var(--background-secondary);
+    }
 
-	:global(.fc .fc-col-header-cell) {
-		background: var(--background-primary);
-		color: var(--text-normal);
-		font-weight: 600;
-	}
+    :global(.fc .fc-col-header-cell) {
+        background: var(--background-primary);
+        color: var(--text-normal);
+        font-weight: 600;
+    }
 
-	:global(.fc .fc-event) {
-		border-radius: 6px;
-		border-color: var(--background-modifier-border);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-	}
+    :global(.fc .fc-event) {
+        border-radius: 6px;
+        border-color: var(--background-modifier-border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
 
-	/* ics calendar events */
-	:global(.fc .fc-event.ics-event) {
-		opacity: 0.9;
-		box-shadow: none;
-		padding: 0 !important;
-		overflow: hidden;
-	}
+    /* ics calendar events */
+    :global(.fc .fc-event.ics-event) {
+        opacity: 0.9;
+        box-shadow: none;
+        padding: 0 !important;
+        overflow: hidden;
+    }
 
-	:global(.fc .fc-event.ics-event:hover) {
-		opacity: 1;
-	}
+    :global(.fc .fc-event.ics-event:hover) {
+        opacity: 1;
+    }
 
-	:global(.ics-event-content) {
-		display: flex;
-		height: 100%;
-		overflow: hidden;
-	}
+    :global(.ics-event-content) {
+        display: flex;
+        height: 100%;
+        overflow: hidden;
+    }
 
-	:global(.ics-color-bar) {
-		width: 4px;
-		flex-shrink: 0;
-	}
+    :global(.ics-color-bar) {
+        width: 4px;
+        flex-shrink: 0;
+    }
 
-	:global(.ics-event-info) {
-		display: flex;
-		flex-direction: column;
-		padding: 4px 8px;
-		overflow: hidden;
-		min-width: 0;
-	}
+    :global(.ics-event-info) {
+        display: flex;
+        flex-direction: column;
+        padding: 4px 8px;
+        overflow: hidden;
+        min-width: 0;
+    }
 
-	/* hide details only when FC marks it as short */
-	:global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
-		display: none;
-	}
+    /* hide details only when FC marks it as short */
+    :global(.fc .fc-timegrid-event.fc-timegrid-event-short .fc-my-event__meta) {
+        display: none;
+    }
 
-	/* timeblock events */
-	:global(.fc .fc-event.timeblock-event) {
-		opacity: 0.85;
-		cursor: grab;
-	}
+    /* timeblock events */
+    :global(.fc .fc-event.timeblock-event) {
+        opacity: 0.85;
+        cursor: grab;
+    }
 
-	:global(.fc .fc-event.timeblock-event:hover) {
-		opacity: 1;
-	}
+    :global(.fc .fc-event.timeblock-event:hover) {
+        opacity: 1;
+    }
 
-	:global(.timeblock-content) {
-		display: flex;
-		flex-direction: column;
-		padding: 4px 8px;
-		height: 100%;
-		overflow: hidden;
-		min-width: 0;
-	}
+    :global(.timeblock-content) {
+        display: flex;
+        flex-direction: column;
+        padding: 4px 8px;
+        height: 100%;
+        overflow: hidden;
+        min-width: 0;
+    }
 
-	.ics-loading :global(svg) {
-		animation: rotate 1s linear infinite;
-	}
+    .ics-loading :global(svg) {
+        animation: rotate 1s linear infinite;
+    }
 
-	@keyframes rotate {
-		from {
-			transform: rotate(0deg);
-		}
-		to {
-			transform: rotate(360deg);
-		}
-	}
+    @keyframes rotate {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
 </style>
