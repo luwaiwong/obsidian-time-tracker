@@ -21,6 +21,7 @@ import { ImportModal } from "./src/modals/ImportSTTModal";
 import { BackupViewerModal } from "./src/modals/BackupViewerModal";
 import { CategoryHandler } from "./src/handlers/categoryHandler";
 import { CreateRecordModal } from "./src/modals/CreateRecordModal";
+import { hslToHex } from "./src/utils/colorUtils";
 
 const DEFAULT_SETTINGS: PluginSettings = {
     timesheetPath: "timesheet.csv",
@@ -345,6 +346,8 @@ export default class TimeTrackerPlugin extends Plugin {
         startTime.setMilliseconds(0);
         const endTime = new Date(timeblock.endTime);
         endTime.setMilliseconds(0);
+
+        timeblock.color = hslToHex(timeblock.color);
 
         const newTimeblock: Timeblock = {
             id: TimeblocksHandler.getNextId(this.timeblocksData.timeblocks),
