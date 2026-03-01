@@ -5,6 +5,7 @@
 	import { slide } from "svelte/transition";
 	import { compareColors } from "..//utils/colorUtils";
   	import { icon } from "../utils/styleUtils";
+	import { createVisibilityInterval } from "../utils/visibilityInterval";
 
 	interface Props {
 		plugin: TimeTrackerPlugin;
@@ -29,7 +30,6 @@
 
 	let dropdownOpen = $state(initialDropdownOpen);
 	let currentTime = $state(Date.now());
-	let interval: number | undefined;
 	let projects = $derived(plugin.timesheetData.projects);
 	let runningTimers = $derived(plugin.runningTimers);
 
@@ -39,14 +39,9 @@
 	});
 
 	$effect(() => {
-		if (interval) clearInterval(interval);
-		interval = window.setInterval(() => {
+		return createVisibilityInterval(() => {
 			currentTime = Date.now();
 		}, 1000);
-
-		return () => {
-			if (interval) clearInterval(interval);
-		};
 	});
 
 	function handleProjectClick(project: Project) {

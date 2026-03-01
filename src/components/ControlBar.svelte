@@ -6,6 +6,7 @@
 	import { CreateRecordModal } from "../modals/CreateRecordModal";
 	import { EditRecordModal } from "../modals/EditRecordModal";
 	import LastRecords from "./LastRecords.svelte";
+	import { createVisibilityInterval } from "../utils/visibilityInterval";
 	import "../../styles.css";
 
 	interface Props {
@@ -25,7 +26,6 @@
 	}: Props = $props();
 
 	let currentTime = $state(Date.now());
-	let interval: number | undefined;
 	let isPlayButtonHovering = $state(false);
 
 	// Derived state
@@ -45,16 +45,10 @@
 	let timerDisplay = $derived(getTimerDisplay());
 	let buttonDisplayText = $derived(getButtonDisplayText());
 
-	// timer update effect
 	$effect(() => {
-		if (interval) clearInterval(interval);
-		interval = window.setInterval(() => {
+		return createVisibilityInterval(() => {
 			currentTime = Date.now();
 		}, 1000);
-
-		return () => {
-			if (interval) clearInterval(interval);
-		};
 	});
 
 	function getButtonDisplayText(): string {

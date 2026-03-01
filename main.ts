@@ -1,4 +1,11 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf, requestUrl } from "obsidian";
+import {
+    Notice,
+    Plugin,
+    TFile,
+    WorkspaceLeaf,
+    requestUrl,
+    debounce,
+} from "obsidian";
 import { TimeTrackerSettingTab } from "./src/settings";
 import {
     TimeTrackerView,
@@ -139,21 +146,29 @@ export default class TimeTrackerPlugin extends Plugin {
             ),
         );
 
-        // reload timesheet when app comes back to foreground for mobile
+        // reload timesheet when app comes back to foreground
         this.registerDomEvent(document, "visibilitychange", () => {
             if (document.visibilityState === "visible") {
                 void this.loadPluginData();
             }
         });
 
-        // reload timesheet every 30 seconds
-        this.registerInterval(
-            window.setInterval(
-                () => {
-                    void this.loadPluginData();
-                },
-                0.5 * 60 * 1000,
-            ),
+        // reload on external file changes instead of polling
+        const debouncedReload = debounce(
+            () => void this.loadPluginData(),
+            1000,
+            true,
+        );
+        this.registerEvent(
+            this.app.vault.on("modify", (file) => {
+                if (
+                    file instanceof TFile &&
+                    (file.path === this.settings.timesheetPath ||
+                        file.path === this.settings.timeblocksPath)
+                ) {
+                    debouncedReload();
+                }
+            }),
         );
     }
 

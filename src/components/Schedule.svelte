@@ -21,6 +21,7 @@
     import { Notice } from "obsidian";
     import { fetchIcsCalendars } from "../handlers/icsHandler";
     import { hslToHex } from "../utils/colorUtils";
+    import { createVisibilityInterval } from "../utils/visibilityInterval";
 
     interface Props {
         plugin: TimeTrackerPlugin;
@@ -42,7 +43,6 @@
     let calendar: Calendar | null = null;
     let selectedDate = $state(new Date());
     let now = $state(Date.now());
-    let interval: number | undefined;
     let icsEvents = $state<IcsCalendarEvent[]>(plugin.icsCache.events);
     let icsLoading = $state(false);
     let zoomLevel = $state(plugin.settings.scheduleZoom);
@@ -346,6 +346,7 @@
     }
 
     let resizeObserver: ResizeObserver | null = null;
+    let cleanupVisibilityInterval: (() => void) | null = null;
 
     function getCurrentScrollTime(): string {
         const now = new Date();
@@ -617,8 +618,8 @@
             fetchIcsEvents(true);
         }
 
-        // update time every 30s for running timers (effect handles calendar update via `now` dependency)
-        interval = window.setInterval(() => {
+        // update time every 30s for running timers - pause when tab hidden
+        cleanupVisibilityInterval = createVisibilityInterval(() => {
             now = Date.now();
         }, 1000 * 30);
 
@@ -646,8 +647,8 @@
         if (calendar) {
             calendar.destroy();
         }
-        if (interval) {
-            clearInterval(interval);
+        if (cleanupVisibilityInterval) {
+            cleanupVisibilityInterval();
         }
     });
 

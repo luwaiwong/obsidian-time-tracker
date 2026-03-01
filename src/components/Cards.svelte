@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatNaturalDuration } from "../utils/timeUtils";
+	import { createVisibilityInterval } from "../utils/visibilityInterval";
 
 	interface CardData {
 		label: string;
@@ -19,10 +20,9 @@
 		const hasDate = cards.some((c) => c.isDate);
 		if (!hasDate) return;
 
-		const interval = setInterval(() => {
+		return createVisibilityInterval(() => {
 			now = Date.now();
 		}, 1000);
-		return () => clearInterval(interval);
 	});
 
 	function getValue(card: CardData): string {
