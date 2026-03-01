@@ -70,11 +70,6 @@ export class CreateTimeblockModal extends Modal {
                 onInput: (value: string) => {
                     this.titleInput = value;
                 },
-                onKeyDown: (e: KeyboardEvent) => {
-                    if (e.key === "Enter") {
-                        void this.save();
-                    }
-                },
             },
         });
 
@@ -214,11 +209,6 @@ export class CreateTimeblockModal extends Modal {
 
     async save() {
         if (this.saved) return;
-
-        if (!this.titleInput.trim()) {
-            new Notice("Please enter a title");
-            return;
-        }
 
         if (this.endTime.getTime() <= this.startTime.getTime()) {
             new Notice("End time must be after start time");

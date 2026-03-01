@@ -71,7 +71,7 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
  */
 export function hslToHex(hsl: string): string {
   const match = hsl.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%?\s*,\s*(\d+)%?\s*\)/);
-  if (!match) return "#000000";
+  if (!match) return hsl;
 
   const h = parseInt(match[1]) / 360;
   const s = parseInt(match[2]) / 100;

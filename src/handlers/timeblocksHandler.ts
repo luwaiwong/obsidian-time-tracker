@@ -162,7 +162,7 @@ export class TimeblocksHandler {
         await this.vault.process(file, () => content);
     }
 
-    async normalizeColor(color: string) {
+    normalizeColor(color: string) {
         if (color.startsWith("#")) {
             return color;
         }
